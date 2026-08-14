@@ -11,6 +11,7 @@ Accepted.
 This decision settles the design of a case-by-case model judge ([#472]); it does not implement it.
 [#472] stays open, tracking the implementation, and carries this ADR.
 It supersedes the reverted ADR 0007 attempted under [#581].
+Amended 2026-08-14 with §7 (one chain per node), which settles where a subagent's ask is adjudicated ([#727]).
 
 ## Context
 
@@ -170,6 +171,29 @@ The "a tool-augmented model can never grant more than the engine grants for the 
 Obfuscation is the residual risk, and it is exactly why slice 2 is gated behind the whole envelope while slice 1 needs almost none.
 The gradient is the argument for shipping deny-first.
 
+### 7. One chain per node
+
+An ask is adjudicated by exactly one node's chain: the node whose terminal decides it.
+
+A node with UI (`LocalUserAuthorizer`) and a headless node with no reachable authority (`DenyingAuthorizer`) both decide locally, so both run their chain.
+A subagent node whose terminal is `ParentAuthorizer` does not decide — it relays the ask to a serving node, which resolves it against its own recorded authority and escalates it through its own chain over the same child-fixed facts ([#635]).
+So a relaying node resolves no links, and its terminal's forwarding *is* how the ask reaches a chain.
+
+This is a consequence of §2's terminal-for-its-node framing, made explicit because the observable behavior contradicted it: a child's chain resolution found no links (a child cannot host one — [#699]) and reported each configured name as a fail-safe skip, which reads as the configured judge never running.
+It runs; it runs one hop up.
+
+The rule is not merely descriptive of the current implementation.
+Running links on a relaying node as well would adjudicate one ask twice — the same link, over the same facts, once in the child and again on the serving node — with a second model call and a second latency, and would let a link decide an ask the serving node's policy owns.
+
+Two review-log records make the placement observable, since a deferring link decides nothing and otherwise leaves no evidence it was consulted:
+
+- `authorizer_chain_resolved` — an adjudicating node's resolved link names, recorded before any of them runs.
+- `authorizer_chain_delegated` — a relaying node's configured names, recorded as deliberately not run.
+
+This leaves `authorizer_chain_unregistered_link` meaning what it says: a name the adjudicating node could not resolve, which is a real misconfiguration.
+
+The rule also settles the shape of [#699]'s fix: a sibling extension should skip registering a link in a registered child rather than registering one that would never be consulted.
+
 ### Relationship to `evaluate()` and rule-driven promotion
 
 The judge sits on the ask-*consuming* side of `evaluate()`, distinct from the ask-*producing* side (rule-driven promotion, [#509]).
@@ -203,6 +227,9 @@ The two compose cleanly: a promoted token emits the same structured descriptor a
 - **Opt-out activation** (a registered link joins the chain automatically; config can only disable it).
   Rejected: it lets a loaded extension gain decision authority unless explicitly disabled, and lets load order influence security-relevant chain order.
   Opt-in (config names the chain) is least-privilege by construction.
+- **A process-global `AuthorizerRegistry`, so a child resolves its parent's links** ([#727]).
+  Rejected: it converts every deferring ask into two link runs, and lets a link's verdict short-circuit before the serving node ever sees the request — a privilege change dressed as a plumbing fix.
+  The forwarding round trip is not the cost being avoided; the serving node resolves the request against its own ruleset regardless.
 - **The model applies the ruleset itself, or emits a static intent.**
   Rejected: the former couples the model to rule semantics; the latter weakens determinism.
   Tool-augmented decomposition keeps the model decoupled from rule semantics (a rule edit is honored automatically) and confines its non-determinism to decomposition.
@@ -222,3 +249,6 @@ The two compose cleanly: a promoted token emits the same structured descriptor a
 [#472]: https://github.com/gotgenes/pi-packages/issues/472
 [#509]: https://github.com/gotgenes/pi-packages/issues/509
 [#581]: https://github.com/gotgenes/pi-packages/issues/581
+[#635]: https://github.com/gotgenes/pi-packages/issues/635
+[#699]: https://github.com/gotgenes/pi-packages/issues/699
+[#727]: https://github.com/gotgenes/pi-packages/issues/727

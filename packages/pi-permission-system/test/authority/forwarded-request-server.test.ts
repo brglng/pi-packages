@@ -1,7 +1,10 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import type { Authorizer } from "#src/authority/authorizer";
+import { AuthorizerRegistry } from "#src/authority/authorizer-registry";
+import { AuthorizerSelection } from "#src/authority/authorizer-selection";
 import { encloseInDelegationEnvelope } from "#src/authority/delegation-envelope";
 import { ForwardedRequestServer } from "#src/authority/forwarded-request-server";
 import type { PermissionPromptDecision } from "#src/authority/permission-dialog";
@@ -9,8 +12,15 @@ import type {
   ForwardedPermissionRequest,
   ForwardedPermissionResponse,
 } from "#src/authority/permission-forwarding";
-import type { PromptPermissionDetails } from "#src/authority/permission-prompter";
+import {
+  PermissionPrompter,
+  type PromptPermissionDetails,
+} from "#src/authority/permission-prompter";
 import type { PermissionQuery } from "#src/service";
+import {
+  makeAuthorizerSelectionDeps,
+  registerLink,
+} from "#test/helpers/authorizer-fixtures";
 import { makeAuthorizerLog } from "#test/helpers/authorizer-log-fixtures";
 import {
   createForwardingTempDir,
@@ -433,6 +443,77 @@ describe("processInbox — bounded delegation over forwarded asks", () => {
     const enclosed = encloseInDelegationEnvelope(allowingLink);
 
     expect(await enclosed(details, query, log)).toEqual({ kind: "allow" });
+  });
+});
+
+describe("processInbox — the serving node's chain adjudicates a forwarded ask", () => {
+  /** A serving node with UI: its terminal is the human prompt. */
+  function makeServingCtx(): ExtensionContext {
+    return {
+      hasUI: true,
+      mode: "tui",
+      ui: { select: vi.fn(), input: vi.fn(), custom: vi.fn() },
+    } as unknown as ExtensionContext;
+  }
+
+  test("a link registered on the serving node decides the forwarded ask before its terminal", async () => {
+    temp = createForwardingTempDir("parent-session");
+    temp.writeRequest({
+      id: "req-chain",
+      source: "tool_call",
+      surface: "bash",
+      value: "rm -rf /tmp/scratch",
+      accessIntent: makeForwardedAccessIntent({
+        matchValues: ["rm -rf /tmp/scratch"],
+      }),
+    });
+
+    const registry = new AuthorizerRegistry();
+    registerLink(registry, "model-judge", {
+      kind: "deny",
+      reason: "destructive",
+    });
+    const requestPermissionDecision = vi
+      .fn()
+      .mockResolvedValue({ approved: true, state: "approved" });
+    const logger = makeAuthorizerLog();
+    // The real chain owner, wired exactly as index.ts wires it: the same
+    // AuthorizerSelection is both the gate's AskEscalator and the forwarded
+    // request server's, so a child's ask is judged by the serving node's chain.
+    const selection = new AuthorizerSelection(
+      makeAuthorizerSelectionDeps({
+        prompter: new PermissionPrompter({ logger }),
+        authorizerRegistry: registry,
+        getAuthorizerChain: () => ["model-judge"],
+        requestPermissionDecision,
+        logger,
+      }),
+    );
+    selection.activate(makeServingCtx());
+
+    const server = new ForwardedRequestServer(
+      makeServerDeps({
+        forwardingDir: temp.forwardingDir,
+        logger,
+        policy: { resolve: vi.fn(() => makeCheckResult({ state: "ask" })) },
+        escalator: selection,
+      }),
+    );
+
+    await server.processInbox(
+      makeForwarderContext({ hasUI: true, sessionId: "parent-session" }),
+    );
+
+    // The link's deny is what the child receives, and the human terminal was
+    // never reached — the chain adjudicated the forwarded ask.
+    expect(readResponse(temp, "req-chain")).toEqual({
+      approved: false,
+      state: "denied_with_reason",
+      denialReason: "destructive",
+      responderSessionId: "parent-session",
+      respondedAt: expect.any(Number),
+    });
+    expect(requestPermissionDecision).not.toHaveBeenCalled();
   });
 });
 

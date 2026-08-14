@@ -51,7 +51,7 @@ interface Authorizer {
 ## Relationship to the Authorizer spine
 
 `PermissionPrompter` no longer assembles or holds any UI/forwarding dependency — it receives the already-selected `Authorizer` as a call-time argument from `AuthorizerSelection.prompt(details)`, rather than threading `ExtensionContext` through a `forwarder.requestApproval(ctx, …)` call.
-`AuthorizerSelection` (the rewrite of the former `PromptingGateway`) owns the selection: `selectAuthorizer(ctx, deps)` runs once per session activation and returns the `Authorizer` for that context — `LocalUserAuthorizer` when `ctx.hasUI`, `ParentAuthorizer` when the context is a no-UI subagent, `DenyingAuthorizer` otherwise.
+`AuthorizerSelection` (the rewrite of the former `PromptingGateway`) owns the selection: `selectAuthorizer(ctx, deps)` runs once per session activation and returns a `SelectedAuthority` for that context — the terminal (`LocalUserAuthorizer` when `ctx.hasUI`, `ParentAuthorizer` when the context is a no-UI subagent, `DenyingAuthorizer` otherwise) plus `adjudicatesLocally`, which is false for the relaying `ParentAuthorizer` arm so that node resolves no chain links (one chain per node, ADR 0007 §7).
 
 ## Wiring
 

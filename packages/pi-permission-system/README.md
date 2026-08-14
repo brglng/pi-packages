@@ -8,12 +8,12 @@
 
 Permission enforcement extension for the [Pi](https://pi.mariozechner.at/) coding agent that provides centralized, deterministic permission gates over tool, bash, MCP, skill, and special operations.
 
-> **Fork notice:** This package is a full fork of [MasuRii/pi-permission-system](https://github.com/MasuRii/pi-permission-system), published to npm as `@gotgenes/pi-permission-system`.
-> It has diverged substantially from upstream in config format, internal architecture, and permission model.
->
 > **Fork notice (brglng):** This package is additionally forked from [`@gotgenes/pi-permission-system`](https://github.com/gotgenes/pi-packages) (`packages/pi-permission-system`) and published to npm as `@brglng/pi-permission-system`.
 > Changes made in this fork:
 > - Add a `fullCommand` field to `PermissionCheckResult`, `PromptPermissionDetails`, and the review log, so an authorizer link (e.g. `@brglng/pi-permission-auto-review`) receives the full chained bash command instead of only the matched sub-command.
+>
+> **Fork notice:** This package is a full fork of [MasuRii/pi-permission-system](https://github.com/MasuRii/pi-permission-system), published to npm as `@gotgenes/pi-permission-system`.
+> It has diverged substantially from upstream in config format, internal architecture, and permission model.
 
 ## What It Does
 
@@ -120,6 +120,7 @@ The optional `shellTools` field records which non-`bash` tools carry shell seman
 
 The optional `authorizerChain` field names registered case-by-case decision links (e.g. a light model judge) to consult when a request lands on `ask`, ahead of the interactive prompt.
 A downstream extension registers a link via `getPermissionsService().registerAuthorizer(name, authorize)`; it decides nothing until you name it here (opt-in), config order fixes the chain order, and the chain owner caps any link's `allow` on `external_directory`/`path` to keep it within your policy — see [docs/configuration.md](docs/configuration.md#authorizer-chain--case-by-case-decision-links).
+A subagent's ask is reviewed by the chain of the session serving it, one hop up, rather than inside the subagent — see the same section.
 [`@gotgenes/pi-permission-model-judge`](https://github.com/gotgenes/pi-packages/tree/main/packages/pi-permission-model-judge) is a first-party reference implementation of such a link — a deny-first reviewer that auto-denies mistyped out-of-directory paths.
 
 For the full reference — all surfaces, runtime knobs, per-agent overrides, merge semantics, and common recipes — see [docs/configuration.md](docs/configuration.md).
