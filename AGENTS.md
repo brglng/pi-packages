@@ -16,13 +16,3 @@ user how to resolve it — do not resolve functional conflicts unilaterally.
 
 Non-functional conflicts (e.g. whitespace, documentation) may be resolved
 directly without asking.
-
-## Every package supports standalone publish
-
-Each package under `packages/` is a self-contained npm package. Publish them
-individually from their own directory:
-
-```bash
-cd packages/<name>
-npm publish
-```
