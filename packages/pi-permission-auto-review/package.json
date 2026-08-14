@@ -1,6 +1,6 @@
 {
   "name": "@brglng/pi-permission-auto-review",
-  "version": "0.3.6",
+  "version": "0.3.5-brglng.1",
   "description": "Model-backed boundary approval broker for Pi",
   "type": "module",
   "license": "MIT",
