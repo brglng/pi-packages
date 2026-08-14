@@ -1,16 +1,21 @@
-# @erichll/pi-auto-review
+# @brglng/pi-permission-auto-review
+
+> **Fork notice:** This package is a fork of [`@erichll/pi-auto-review`](https://github.com/erichll/pi-packages) (`packages/pi-auto-review`).
+> Changes made in this fork:
+> - Prefer the `fullCommand` field from `@brglng/pi-permission-system` so a chained bash command (e.g. `cd x && git commit -m "..."`) is reviewed as a whole instead of only the matched sub-command.
+> - Point the permission-system type import and peer dependency at `@brglng/pi-permission-system`.
 
 A model-backed boundary approval broker for the Pi coding agent.
 
 `pi-auto-review` currently integrates with
-`@gotgenes/pi-permission-system` as an authorizer-chain link. It also publishes
+`@brglng/pi-permission-system` as an authorizer-chain link. It also publishes
 a small cross-extension broker service so an OS sandbox adapter can submit
 filesystem and network boundary requests without creating a second approval
 system.
 
 The package name and model name are intentionally separate:
 
-- npm package: `@erichll/pi-auto-review`
+- npm package: `@brglng/pi-permission-auto-review`
 - Authorizer: `pi-auto-review`
 - Default reviewer model: `codex-auto-review`
 
@@ -147,7 +152,7 @@ Adapters should normally use the exported helper:
 import {
   getBoundaryBroker,
   type BoundaryRequest,
-} from "@erichll/pi-auto-review";
+} from "@brglng/pi-permission-auto-review";
 
 const request: BoundaryRequest = {
   id: "sandbox-runtime-query-id",
@@ -225,7 +230,7 @@ agent-writable workspace. Install production copies as a user-level npm
 package, or as a Git package pinned to a reviewed tag or commit:
 
 ```bash
-pi install npm:@erichll/pi-auto-review
+pi install npm:@brglng/pi-permission-auto-review
 ```
 
 Pi places user npm packages under `~/.pi/agent/npm/` and Git packages under
@@ -260,7 +265,7 @@ PI_AUTO_REVIEW_SMOKE_AUDIT_PATH=/tmp/pi-auto-review-smoke-audit.jsonl \
 pi --no-extensions --no-skills --no-prompt-templates --no-context-files \
   --no-builtin-tools --no-session --print \
   --extension /trusted/path/to/your-model-provider/extensions/index.ts \
-  --extension ./packages/pi-auto-review/src/index.ts \
+  --extension ./packages/pi-permission-auto-review/src/index.ts \
   --extension ./packages/pi-sandbox/src/index.ts \
   --extension ./scripts/real-model-smoke-audit.ts \
   --model provider/your-available-model \

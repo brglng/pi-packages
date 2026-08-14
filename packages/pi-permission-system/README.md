@@ -2,14 +2,18 @@
   <img src="docs/assets/logo.png" alt="pi-permission-system logo">
 </p>
 
-# @gotgenes/pi-permission-system
+# @brglng/pi-permission-system
 
-[![npm version](https://img.shields.io/npm/v/@gotgenes/pi-permission-system?style=flat&logo=npm&logoColor=white)](https://www.npmjs.com/package/@gotgenes/pi-permission-system) [![CI](https://img.shields.io/github/actions/workflow/status/gotgenes/pi-packages/ci.yml?style=flat&logo=github&label=CI)](https://github.com/gotgenes/pi-packages/actions/workflows/ci.yml) [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg?style=flat)](https://opensource.org/licenses/MIT) [![TypeScript](https://img.shields.io/badge/TypeScript-6.x-3178C6?style=flat&logo=typescript&logoColor=white)](https://www.typescriptlang.org/) [![pnpm](https://img.shields.io/badge/pnpm-%3E%3D11-F69220?style=flat&logo=pnpm&logoColor=white)](https://pnpm.io/) [![Pi Package](https://img.shields.io/badge/Pi-Package-6366F1?style=flat)](https://pi.mariozechner.at/)
+[![npm version](https://img.shields.io/npm/v/@brglng/pi-permission-system?style=flat&logo=npm&logoColor=white)](https://www.npmjs.com/package/@brglng/pi-permission-system) [![CI](https://img.shields.io/github/actions/workflow/status/brglng/pi-packages/ci.yml?style=flat&logo=github&label=CI)](https://github.com/brglng/pi-packages/actions/workflows/ci.yml) [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg?style=flat)](https://opensource.org/licenses/MIT) [![TypeScript](https://img.shields.io/badge/TypeScript-6.x-3178C6?style=flat&logo=typescript&logoColor=white)](https://www.typescriptlang.org/) [![pnpm](https://img.shields.io/badge/pnpm-%3E%3D11-F69220?style=flat&logo=pnpm&logoColor=white)](https://pnpm.io/) [![Pi Package](https://img.shields.io/badge/Pi-Package-6366F1?style=flat)](https://pi.mariozechner.at/)
 
 Permission enforcement extension for the [Pi](https://pi.mariozechner.at/) coding agent that provides centralized, deterministic permission gates over tool, bash, MCP, skill, and special operations.
 
 > **Fork notice:** This package is a full fork of [MasuRii/pi-permission-system](https://github.com/MasuRii/pi-permission-system), published to npm as `@gotgenes/pi-permission-system`.
 > It has diverged substantially from upstream in config format, internal architecture, and permission model.
+>
+> **Fork notice (brglng):** This package is additionally forked from [`@gotgenes/pi-permission-system`](https://github.com/gotgenes/pi-packages) (`packages/pi-permission-system`) and published to npm as `@brglng/pi-permission-system`.
+> Changes made in this fork:
+> - Add a `fullCommand` field to `PermissionCheckResult`, `PromptPermissionDetails`, and the review log, so an authorizer link (e.g. `@brglng/pi-permission-auto-review`) receives the full chained bash command instead of only the matched sub-command.
 
 ## What It Does
 
@@ -27,7 +31,7 @@ Permission enforcement extension for the [Pi](https://pi.mariozechner.at/) codin
 ## Install
 
 ```bash
-pi install npm:@gotgenes/pi-permission-system
+pi install npm:@brglng/pi-permission-system
 ```
 
 ## Quick Start

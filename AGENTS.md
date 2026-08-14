@@ -8,7 +8,7 @@ Before pushing any commit, merge the latest upstream into each forked package.
 The upstream remotes are:
 
 - `@brglng/pi-permission-system` → `https://github.com/gotgenes/pi-packages` (path `packages/pi-permission-system`)
-- `@brglng/pi-auto-review` → `https://github.com/erichll/pi-packages` (path `packages/pi-auto-review`)
+- `@brglng/pi-permission-auto-review` → `https://github.com/erichll/pi-packages` (path `packages/pi-auto-review`)
 
 For each package with an upstream, run the upstream fetch and merge before
 pushing. When a functional conflict arises during the merge, stop and ask the

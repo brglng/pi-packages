@@ -1,0 +1,8 @@
+{
+  "name": "pi-packages",
+  "private": true,
+  "description": "Pi coding-agent extensions maintained by brglng",
+  "scripts": {
+    "publish:all": "pnpm -r publish --no-git-checks"
+  }
+}

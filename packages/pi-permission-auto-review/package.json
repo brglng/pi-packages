@@ -1,5 +1,5 @@
 {
-  "name": "@brglng/pi-auto-review",
+  "name": "@brglng/pi-permission-auto-review",
   "version": "0.3.6",
   "description": "Model-backed boundary approval broker for Pi",
   "type": "module",
@@ -14,9 +14,9 @@
   "repository": {
     "type": "git",
     "url": "git+https://github.com/brglng/pi-packages.git",
-    "directory": "packages/pi-auto-review"
+    "directory": "packages/pi-permission-auto-review"
   },
-  "homepage": "https://github.com/brglng/pi-packages/tree/main/packages/pi-auto-review#readme",
+  "homepage": "https://github.com/brglng/pi-packages/tree/main/packages/pi-permission-auto-review#readme",
   "bugs": {
     "url": "https://github.com/brglng/pi-packages/issues"
   },
@@ -54,7 +54,7 @@
   "devDependencies": {
     "@earendil-works/pi-ai": "0.83.0",
     "@earendil-works/pi-coding-agent": "0.83.0",
-    "@gotgenes/pi-permission-system": "24.0.0",
+    "@brglng/pi-permission-system": "25.1.1",
     "@types/node": "^22.15.3",
     "typescript": "^6.0.3"
   }
