@@ -1,2 +1,54 @@
 packages:
   - "packages/*"
+
+# pi-subagents-* extension packages consume their siblings from the npm registry
+# (the published tarball ships the bundled dist/public.d.ts), not via workspace
+# symlinks — a symlinked sibling would resolve exports.types to the gitignored,
+# unbuilt dist on a fresh checkout. Cross-package links must opt in explicitly
+# with the workspace: protocol.
+linkWorkspacePackages: false
+
+# Centralize version management across all packages.
+# In each package.json, use "catalog:" as the version specifier
+# to pull from here (e.g. "vitest": "catalog:").
+catalog:
+  "@biomejs/biome": "^2.4.16"
+  "eslint": "^10.4.1"
+  "globals": "^17.5.0"
+  "typescript-eslint": "^8.61.0"
+  "rumdl": "^0.2.10"
+  "typescript": "^6.0.3"
+  "vitest": "^4.1.8"
+  "@types/node": "^22.15.3"
+  fallow: "^3.2.0"
+  rollup: "^4.62.2"
+  "rollup-plugin-dts": "^6.4.1"
+
+allowBuilds:
+  "@google/genai": true
+  fallow: true
+  koffi: true
+  protobufjs: true
+  tree-sitter-bash: true
+
+minimumReleaseAgeExclude:
+  - '@fallow-cli/darwin-arm64@3.2.0'
+  - '@fallow-cli/darwin-x64@3.2.0'
+  - '@fallow-cli/linux-arm64-gnu@3.2.0'
+  - '@fallow-cli/linux-arm64-musl@3.2.0'
+  - '@fallow-cli/linux-x64-gnu@3.2.0'
+  - '@fallow-cli/linux-x64-musl@3.2.0'
+  - '@fallow-cli/win32-arm64-msvc@3.2.0'
+  - '@fallow-cli/win32-x64-msvc@3.2.0'
+  - fallow@3.2.0
+  - '@brglng/pi-permission-system@25.1.1'
+
+# A freshly-published first-party sibling (e.g. a same-day @gotgenes/* release a
+# dependent package bumps to) cannot be unblocked via minimumReleaseAgeExclude:
+# that list is honored during dependency resolution but NOT during pnpm's
+# lockfile supply-chain verification pass, which re-applies minimumReleaseAge to
+# every pinned lockfile entry and fails CI's frozen install. trustLockfile
+# treats the committed, PR-reviewed lockfile as trusted and skips that
+# re-verification, so a same-day sibling release installs immediately; the age
+# delay still applies to fresh `pnpm add`/`update` resolutions.
+trustLockfile: true
