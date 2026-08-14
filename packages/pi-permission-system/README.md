@@ -180,5 +180,4 @@ Thank you to the [OpenCode](https://opencode.ai) team for the permission model d
 
 ## License
 
-Original code in this repository is licensed under the [MPL-2.0](../../LICENSE).
-Forked extensions under `packages/` follow their respective upstream licenses, as stated in each package's own `LICENSE` file.
+[MIT](LICENSE)
