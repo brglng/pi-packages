@@ -29,4 +29,5 @@ upstream, list the upstream as `—` and the type as `original`.
 
 ## License
 
-See each package's own `LICENSE` file.
+Original code in this repository is licensed under the [MPL-2.0](LICENSE).
+Forked extensions under `packages/` follow their respective upstream licenses, as stated in each package's own `LICENSE` file.
