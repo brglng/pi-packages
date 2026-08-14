@@ -2,17 +2,26 @@
 
 Guidelines for agents working in this repository.
 
-## Merge from upstream before every push
+## Ask before merging from upstream
 
-Before pushing any commit, merge the latest upstream into each forked package.
+Before modifying a forked extension package, ask the user whether to first
+merge the latest upstream functionality. Offer an option to skip upstream
+merges for the rest of the current session, without asking again.
+
 The upstream remotes are:
 
 - `@brglng/pi-permission-system` → `https://github.com/gotgenes/pi-packages` (path `packages/pi-permission-system`)
 - `@brglng/pi-permission-auto-review` → `https://github.com/erichll/pi-packages` (path `packages/pi-auto-review`)
 
-For each package with an upstream, run the upstream fetch and merge before
-pushing. When a functional conflict arises during the merge, stop and ask the
-user how to resolve it — do not resolve functional conflicts unilaterally.
+Do not use `git merge`: this repo shares no common ancestor with the upstream
+repos. Compare the code directly and merge at the functional level. When a
+functional conflict arises during the merge, stop and ask the user how to
+resolve it — do not resolve functional conflicts unilaterally.
 
-Non-functional conflicts (e.g. whitespace, documentation) may be resolved
-directly without asking.
+## Versioning
+
+- If upstream's latest version is newer than ours, merge upstream first, then
+  publish `X.Y.Z-brglng.1` (taking upstream's `X.Y.Z`). If upstream is not
+  newer, bump current `-brglng.x` version to `-brglng.x+1`.
+- The published version should carry the `latest` dist-tag; publish with
+  `--tag latest` (npm requires an explicit tag for prerelease versions).
