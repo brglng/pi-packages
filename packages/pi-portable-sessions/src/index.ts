@@ -5,6 +5,7 @@ import type {
   ExtensionCommandContext,
 } from "@earendil-works/pi-coding-agent";
 import { getAgentDir } from "@earendil-works/pi-coding-agent";
+import { Text } from "@earendil-works/pi-tui";
 import { getSessionsRoot, loadConfig, toPortableNameOptions } from "./config";
 import {
   defaultSessionDirName,
@@ -109,33 +110,52 @@ export default function piPortableSessionsExtension(pi: ExtensionAPI): void {
     return { action: "handled" as const };
   });
 
-  pi.on("session_start", async (_event, ctx) => {
+  pi.on("session_start", async (event, ctx) => {
     const { config } = await loadConfig(agentDir, ctx.cwd);
-    if (!config.notifyOnStart) {
+    // The hint belongs to Pi startup only. Whenever a session is entered or
+    // switched afterwards (resume/new/fork/reload), or when notifications are
+    // disabled, clear any widget that may still be showing.
+    const clearWidget = () =>
+      ctx.ui.setWidget("pi-portable-sessions", undefined);
+    if (!config.notifyOnStart || event.reason !== "startup") {
+      clearWidget();
       return;
     }
     const sessionsRoot = await getSessionsRoot(agentDir, ctx.cwd);
     const pending = await findPendingMigrations(config, { sessionsRoot });
     if (pending.length === 0) {
+      clearWidget();
       return;
     }
-    const lines = [
-      `pi-portable-sessions: ${pending.length} session director${pending.length === 1 ? "y" : "ies"} can be migrated:`,
-      ...pending.slice(0, 10).map((item) => {
-        return `  ${item.defaultDirName}  →  ${item.portableName}`;
-      }),
-    ];
-    if (pending.length > 10) {
-      lines.push(`  … and ${pending.length - 10} more`);
-    }
-    lines.push("");
     const hasCurrent = pending.some((item) => item.cwd === ctx.cwd);
-    lines.push(
-      hasCurrent
-        ? "Run /portable-sessions migrate to migrate the current project."
-        : "Run /portable-sessions migrate --all to migrate all of them.",
-    );
-    ctx.ui.notify(lines.join("\n"), "info");
+    const shown = pending.slice(0, 10);
+    const width = Math.max(...shown.map((item) => item.defaultDirName.length));
+    ctx.ui.setWidget("pi-portable-sessions", (_tui, theme) => {
+      const lines = [
+        theme.fg(
+          "accent",
+          `📁 pi-portable-sessions: ${pending.length} session director${pending.length === 1 ? "y" : "ies"} can be migrated`,
+        ),
+        "",
+        ...shown.map((item) => {
+          const from = item.defaultDirName.padEnd(width);
+          return `  ${from}  ${theme.fg("success", "→")}  ${item.portableName}`;
+        }),
+      ];
+      if (pending.length > 10) {
+        lines.push(`  … and ${pending.length - 10} more`);
+      }
+      lines.push("");
+      lines.push(
+        theme.fg(
+          "dim",
+          hasCurrent
+            ? "Run /portable-sessions migrate to migrate the current project."
+            : "Run /portable-sessions migrate --all to migrate all of them.",
+        ),
+      );
+      return new Text(lines.join("\n"), 0, 0);
+    });
   });
 
   pi.registerCommand("portable-sessions", {
@@ -293,6 +313,9 @@ export default function piPortableSessionsExtension(pi: ExtensionAPI): void {
     } finally {
       migrating = false;
     }
+
+    // The startup widget may be stale now; clear it.
+    ctx.ui.setWidget("pi-portable-sessions", undefined);
 
     const lines = [summarize(results, false)];
     for (const warning of warnings) {
