@@ -1,5 +1,7 @@
 # @brglng/pi-portable-sessions
 
+> For a Chinese version of this document, see [README.zh.md](README.zh.md).
+
 Portable session directory names for the [Pi coding agent](https://github.com/earendil-works/pi-mono).
 
 By default, Pi stores each project's sessions under a directory named after the
@@ -15,8 +17,6 @@ directory into a **portable** root — the home prefix becomes `HOME`, other roo
 become `ROOT`, and the remaining path is URL-encoded — so the same project maps
 to the same directory name on every machine. That makes session directories
 syncable and shareable across machines.
-
-For a Chinese version of this document, see [README.zh.md](README.zh.md).
 
 ## How it works
 

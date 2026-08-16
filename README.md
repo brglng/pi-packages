@@ -1,8 +1,8 @@
 # pi-packages
 
-A collection of Pi coding-agent extensions maintained by brglng.
+> For a Chinese version of this document, see [README.zh.md](README.zh.md).
 
-For a Chinese version of this document, see [README.zh.md](README.zh.md).
+A collection of Pi coding-agent extensions maintained by brglng.
 
 ## Packages
 
