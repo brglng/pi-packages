@@ -6,12 +6,12 @@ By default, Pi stores each project's sessions under a directory named after the
 encoded working directory:
 
 ```text
-~/.pi/agent/sessions/--Users-zpan-my-project--/20240816_1234abcd.jsonl
+~/.pi/agent/sessions/--Users-brglng-my-project--/20240816_1234abcd.jsonl
 ```
 
 The name embeds the absolute path, so it is different on every machine (different
-user name, different mount point). `@brglng/pi-portable-sessions` renames that
-directory to a **portable** form — the home prefix becomes `HOME`, other roots
+user name, different mount point). `@brglng/pi-portable-sessions` moves that
+directory into a **portable** root — the home prefix becomes `HOME`, other roots
 become `ROOT`, and the remaining path is URL-encoded — so the same project maps
 to the same directory name on every machine. That makes session directories
 syncable and shareable across machines.
@@ -21,17 +21,29 @@ For a Chinese version of this document, see [README.zh.md](README.zh.md).
 ## How it works
 
 Pi hard-codes the `--<encoded-cwd>--` directory name. This extension cannot
-change Pi's internal encoding, so it migrates the directory and leaves a
-**symlink bridge** at Pi's default path:
+change Pi's internal encoding, so it keeps Pi's default path as a **symlink
+bridge** into a portable directory under its own root:
 
 ```text
 ~/.pi/agent/sessions/
-├── HOME%2Fmy-project/            ← real directory (portable name)
-└── --Users-brglng-my-project--   ← symlink → HOME%2Fmy-project
+└── --Users-brglng-my-project--   ← symlink → ~/.pi/agent/portable-sessions/HOME%2Fmy-project
+
+~/.pi/agent/portable-sessions/
+└── HOME%2Fmy-project/            ← real directory (portable name)
 ```
 
 Pi keeps writing through the symlink, so the current session, `/resume`, and
-future startups all keep working while the on-disk name becomes portable.
+future startups all keep working while the physical storage lives in the
+portable root.
+
+### Auto-bridge on session start
+
+Whenever a session starts (startup, resume, new, or fork), the current
+project's default directory is **automatically bridged**: Pi's `--<cwd>--`
+directory becomes a symlink into a fresh `portable-sessions/<portable-name>`
+directory. This is idempotent — already bridged projects are left untouched.
+The portable root is separate from Pi's sessions root, so the sessions root
+only ever contains symlinks.
 
 ## Naming rules
 
@@ -75,7 +87,8 @@ Project values override global values; `extraPrefixes` maps are merged. See
   "extraPrefixes": {
     "/Volumes/Backup": "BACKUP"
   },
-  "notifyOnStart": true
+  "notifyOnStart": true,
+  "portableRoot": "~/.pi/agent/portable-sessions"
 }
 ```
 
@@ -84,11 +97,13 @@ Project values override global values; `extraPrefixes` maps are merged. See
 | `homeLabel` | `HOME` | Label replacing the home directory prefix. |
 | `rootLabel` | `ROOT` | Label replacing the root directory prefix. |
 | `extraPrefixes` | `{}` | Additional absolute path prefix → label mappings. |
-| `notifyOnStart` | `true` | After Pi starts, notify which session directories can be migrated and the command to run. |
+| `notifyOnStart` | `true` | After Pi starts, notify which session directories can still be migrated. |
+| `portableRoot` | `<agentDir>/portable-sessions` | Root directory holding the portable session directories. |
 
-The session root directory is not configurable here: it is resolved from Pi
-itself, with the same precedence Pi uses — `PI_CODING_AGENT_SESSION_DIR`, then
-`sessionDir` in `settings.json`, then the default `<agentDir>/sessions`.
+The migration source (Pi's sessions root) is not configurable here: it is
+resolved from Pi itself, with the same precedence Pi uses —
+`PI_CODING_AGENT_SESSION_DIR`, then `sessionDir` in `settings.json`, then the
+default `<agentDir>/sessions`.
 
 ## Commands
 
@@ -108,13 +123,13 @@ a symlink at Pi's default path.
 - `--dry-run` — preview what would change without moving anything.
 - `--yes` — skip the confirmation dialog (required in non-TUI modes).
 
-Before anything is moved, a confirmation dialog shows each rename — the current
-directory name and its portable target:
+In interactive mode the migration walks **one directory at a time**: each
+rename is confirmed individually before it is migrated, then the next one is
+offered.
 
 ```text
-Migrate 2 session directories?
+Migrate session directory?
   --Users-brglng-project-a--  →  HOME%2Fproject-a
-  --var-www--                 →  ROOT%2Fvar%2Fwww
 ```
 
 While the migration runs, Pi blocks session operations (`/new`, `/resume`,
@@ -137,20 +152,19 @@ directories and skips them.
 
 After Pi starts, the extension scans the sessions root and notifies when
 session directories can still be migrated, listing each rename and the command
-to run (`/portable-sessions migrate` for the current project, or
-`/portable-sessions migrate --all` for everything). Disable with
-`"notifyOnStart": false` in the config.
+to run (`/portable-sessions migrate --all` for everything, or pass individual
+directory names). Disable with `"notifyOnStart": false` in the config.
 
 ## Limitations
 
 - Pi's *current* session file is still addressed through the `--<encoded-cwd>--`
-  symlink; only the physical directory name changes. This is intentional — it is
-  what keeps Pi fully functional before and after migration.
+  symlink; only the physical directory location changes. This is intentional —
+  it is what keeps Pi fully functional before and after migration.
 - When a portable directory already exists (for example, sessions synced from
   another machine), migration merges files into it without overwriting existing
   ones.
 - Session directories with no readable session-file header cannot be migrated by
-  `--all`; they are reported and skipped.
+  `--all`; they are skipped and counted in the summary.
 
 ## License
 

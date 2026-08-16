@@ -78,8 +78,13 @@ export type JsonlConflictHandler = (
 export interface MigrateOptions {
   /** Only compute what would change; do not move files or create links. */
   dryRun?: boolean;
-  /** Pi's sessions root. Required. */
+  /** Pi's sessions root (the migration source). Required. */
   sessionsRoot?: string;
+  /**
+   * Root directory holding the portable session directories. Defaults to
+   * `<sessionsRoot>/../portable-sessions`.
+   */
+  portableRoot?: string;
   /**
    * Called for every same-named `.jsonl` file that already exists in the
    * target portable directory, so the caller can merge the contents (e.g. with
@@ -223,9 +228,11 @@ export async function migrateSessionDir(
   options: MigrateOptions = {},
 ): Promise<MigrationResult> {
   const sessionsRoot = requireSessionsRoot(options);
+  const portableRoot =
+    options.portableRoot ?? join(sessionsRoot, "..", "portable-sessions");
   const defaultDir = join(sessionsRoot, defaultSessionDirName(cwd));
   const portableName = portableSessionDirName(cwd, config);
-  const portableDir = join(sessionsRoot, portableName);
+  const portableDir = join(portableRoot, portableName);
 
   const base: Omit<MigrationResult, "state"> = {
     cwd,
@@ -264,7 +271,7 @@ export async function migrateSessionDir(
     return { ...base, state: "would-migrate" };
   }
 
-  await mkdir(sessionsRoot, { recursive: true });
+  await mkdir(portableRoot, { recursive: true });
   let filesMerged = 0;
   let jsonlConflicts = 0;
   let jsonlMerged = 0;

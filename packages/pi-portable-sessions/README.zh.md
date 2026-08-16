@@ -18,15 +18,24 @@ URL 编码——使同一项目在任何机器上都映射到相同的目录名�
 ## 工作原理
 
 Pi 硬编码了 `--<encoded-cwd>--` 目录名，本扩展无法修改 Pi 内部的编码逻辑，
-因此它迁移目录并在 Pi 的默认路径上留下**符号链接桥**：
+因此它在 Pi 的默认路径上保留**符号链接桥**，指向位于独立可移植根下的真实目录：
 
 ```text
 ~/.pi/agent/sessions/
-├── HOME%2Fmy-project/            ← 真实目录（可移植名）
-└── --Users-brglng-my-project--   ← symlink → HOME%2Fmy-project
+└── --Users-brglng-my-project--   ← symlink → ~/.pi/agent/portable-sessions/HOME%2Fmy-project
+
+~/.pi/agent/portable-sessions/
+└── HOME%2Fmy-project/            ← 真实目录（可移植名）
 ```
 
-Pi 会继续通过符号链接写入，因此当前 session、`/resume` 以及之后的每次启动都照常工作，而磁盘上的目录名已经变成可移植形式。
+Pi 会继续通过符号链接写入，因此当前 session、`/resume` 以及之后的每次启动都照常工作，而物理存储位于可移植根下。
+
+### 启动时自动桥接
+
+每当 session 启动（启动、恢复、新建或分叉），当前项目的默认目录会被**自动桥接**：
+Pi 的 `--<cwd>--` 目录变成指向新建的 `portable-sessions/<portable-name>` 目录的符号链接。
+该操作幂等——已桥接的项目不会重复处理。可移植根与 Pi 的 sessions 根分离，
+因此 sessions 根下只会有符号链接。
 
 ## 命名规则
 
@@ -69,7 +78,8 @@ npm install -g @brglng/pi-portable-sessions
   "extraPrefixes": {
     "/Volumes/Backup": "BACKUP"
   },
-  "notifyOnStart": true
+  "notifyOnStart": true,
+  "portableRoot": "~/.pi/agent/portable-sessions"
 }
 ```
 
@@ -78,9 +88,10 @@ npm install -g @brglng/pi-portable-sessions
 | `homeLabel` | `HOME` | 替换家目录前缀的标签。 |
 | `rootLabel` | `ROOT` | 替换根目录前缀的标签。 |
 | `extraPrefixes` | `{}` | 额外的「绝对路径前缀 → 标签」映射。 |
-| `notifyOnStart` | `true` | Pi 启动后提示哪些 session 目录可以迁移及应运行的命令。 |
+| `notifyOnStart` | `true` | Pi 启动后提示哪些 session 目录仍可迁移。 |
+| `portableRoot` | `<agentDir>/portable-sessions` | 存放可移植 session 目录的根目录。 |
 
-session 根目录不在配置中：它由 Pi 自身解析，优先级与 Pi 一致——
+迁移源（Pi 的 sessions 根）不在配置中：它由 Pi 自身解析，优先级与 Pi 一致——
 `PI_CODING_AGENT_SESSION_DIR`、`settings.json` 中的 `sessionDir`、默认的
 `<agentDir>/sessions`。
 
@@ -102,12 +113,11 @@ session 根目录不在配置中：它由 Pi 自身解析，优先级与 Pi 一�
 - `--dry-run`：只预览将要发生的变化，不移动任何文件。
 - `--yes`：跳过确认对话框（非 TUI 模式下必需）。
 
-移动任何内容之前，会弹出确认对话框，逐条显示重命名——当前目录名与其可移植目标：
+交互模式下迁移会**逐项**进行：每一条重命名单独确认后再迁移，然后才进入下一项。
 
 ```text
-Migrate 2 session directories?
+Migrate session directory?
   --Users-brglng-project-a--  →  HOME%2Fproject-a
-  --var-www--                 →  ROOT%2Fvar%2Fwww
 ```
 
 迁移期间，Pi 会阻止 session 操作（`/new`、`/resume`、`/fork`、`/tree`、
@@ -125,18 +135,17 @@ JSONL 文件合并进目标文件。合并运行的 session 被隔离在一个�
 ## 启动提示
 
 Pi 启动后，扩展会扫描 sessions 根目录，并在仍有 session 目录可迁移时给出
-通知，列出每个重命名项及应运行的命令（当前项目用 `/portable-sessions
-migrate`，全部迁移用 `/portable-sessions migrate --all`）。可在配置中设置
-`"notifyOnStart": false` 关闭。
+通知，列出每个重命名项及应运行的命令（全部迁移用 `/portable-sessions
+migrate --all`，或逐个传入目录名）。可在配置中设置 `"notifyOnStart": false` 关闭。
 
 ## 局限
 
 - Pi 的*当前* session 文件仍通过 `--<encoded-cwd>--` 符号链接寻址，只有物理
-  目录名改变。这是有意为之——正是它保证了迁移前后 Pi 完全可用。
+  存储位置改变。这是有意为之——正是它保证了迁移前后 Pi 完全可用。
 - 当可移植目录已存在（例如从另一台机器同步而来）时，迁移会合并文件而不覆盖
   已有文件；未能合并的同名 jsonl 会以 `*-conflicted.jsonl` 名称保留，避免数据
   丢失。
-- `--all` 无法迁移读不到 session 文件头部的目录；这类目录会被报告并跳过。
+- `--all` 无法迁移读不到 session 文件头部的目录；这类目录会被跳过并在汇总中计数。
 
 ## License
 

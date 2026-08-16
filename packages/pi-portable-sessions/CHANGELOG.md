@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.4.0
+
+- **New storage layout**: portable session directories now live in their own
+  root (`<agentDir>/portable-sessions` by default, configurable via
+  `portableRoot`) instead of Pi's own sessions root. Pi's `--<cwd>--` path
+  becomes a symlink into the portable root.
+- **Auto-bridge**: whenever a session starts, the current project's default
+  directory is automatically bridged to the portable root (idempotent).
+- The "delete original directory" prompt after each migration is removed (the
+  original path is now a symlink and is kept as the bridge).
+
 ## 0.3.0
 
 - Interactive `migrate` now walks each pending migration one at a time: confirm

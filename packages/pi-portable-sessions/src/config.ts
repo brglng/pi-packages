@@ -5,9 +5,9 @@ import { getGlobalConfigPath, getProjectConfigPath } from "./config-paths";
 import type { PortableNameOptions } from "./portable-name";
 
 /**
- * Resolved extension configuration. The session root directory is resolved
- * from Pi itself (see {@link getSessionsRoot}), so it is not configurable
- * here.
+ * Resolved extension configuration. The migration source root (Pi's session
+ * directory) is resolved from Pi itself (see {@link getSessionsRoot}); the
+ * portable storage root is configurable via `portableRoot`.
  */
 export interface PortableSessionsConfig {
   /** Label replacing the home directory prefix. Default: "HOME". */
@@ -21,6 +21,11 @@ export interface PortableSessionsConfig {
    * command to run. Default: true.
    */
   notifyOnStart: boolean;
+  /**
+   * Root directory holding the portable session directories (outside Pi's own
+   * sessions root). `undefined` means `<agentDir>/portable-sessions`.
+   */
+  portableRoot: string | undefined;
 }
 
 export const DEFAULT_CONFIG: PortableSessionsConfig = {
@@ -28,6 +33,7 @@ export const DEFAULT_CONFIG: PortableSessionsConfig = {
   rootLabel: "ROOT",
   extraPrefixes: {},
   notifyOnStart: true,
+  portableRoot: undefined,
 };
 
 /** Warnings collected while normalizing/merging raw config values. */
@@ -96,6 +102,13 @@ export function normalizeConfig(
       warnings.push("notifyOnStart must be a boolean; ignoring");
     }
   }
+  if (raw.portableRoot !== undefined) {
+    if (isNonEmptyString(raw.portableRoot)) {
+      config.portableRoot = raw.portableRoot;
+    } else {
+      warnings.push("portableRoot must be a non-empty string; ignoring");
+    }
+  }
   return { config, warnings };
 }
 
@@ -141,6 +154,27 @@ export function toPortableNameOptions(
     rootLabel: config.rootLabel,
     extraPrefixes: config.extraPrefixes,
   };
+}
+
+/**
+ * Resolve the portable storage root: expands `~`, rejects non-absolute
+ * values. Falls back to `defaultRoot` when the config leaves it unset.
+ */
+export function resolvePortableRoot(
+  config: PortableSessionsConfig,
+  defaultRoot: string,
+): string {
+  if (config.portableRoot === undefined) {
+    return defaultRoot;
+  }
+  const expanded = config.portableRoot.replace(/^~(?=\/|\\|$)/, homedir());
+  const resolved = resolve(expanded);
+  if (!isAbsolute(resolved)) {
+    throw new Error(
+      `portableRoot must be an absolute path: ${config.portableRoot}`,
+    );
+  }
+  return resolved;
 }
 
 /** Environment variable Pi uses to override the session directory. */

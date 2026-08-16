@@ -1,4 +1,4 @@
-import { rm, stat } from "node:fs/promises";
+import { stat } from "node:fs/promises";
 import { basename, join } from "node:path";
 import type {
   ExtensionAPI,
@@ -6,7 +6,12 @@ import type {
 } from "@earendil-works/pi-coding-agent";
 import { getAgentDir } from "@earendil-works/pi-coding-agent";
 import { Text } from "@earendil-works/pi-tui";
-import { getSessionsRoot, loadConfig, toPortableNameOptions } from "./config";
+import {
+  getSessionsRoot,
+  loadConfig,
+  resolvePortableRoot,
+  toPortableNameOptions,
+} from "./config";
 import {
   defaultSessionDirName,
   findPendingMigrations,
@@ -127,6 +132,26 @@ export default function piPortableSessionsExtension(pi: ExtensionAPI): void {
 
   pi.on("session_start", async (event, ctx) => {
     const { config } = await loadConfig(agentDir, ctx.cwd);
+    const sessionsRoot = await getSessionsRoot(agentDir, ctx.cwd);
+    const portableRoot = resolvePortableRoot(
+      config,
+      join(agentDir, "portable-sessions"),
+    );
+
+    // Whenever a session starts, make sure the current project's directory is
+    // bridged: Pi's default `--<cwd>--` directory becomes a symlink into a
+    // `portable-sessions/<portable-name>` directory. Idempotent — already
+    // bridged projects (default path is a symlink) are left untouched.
+    migrating = true;
+    try {
+      await migrateSessionDir(ctx.cwd, config, {
+        sessionsRoot,
+        portableRoot,
+      });
+    } finally {
+      migrating = false;
+    }
+
     // The hint belongs to Pi startup only. Whenever a session is entered or
     // switched afterwards (resume/new/fork/reload), or when notifications are
     // disabled, clear any widget that may still be showing.
@@ -136,7 +161,6 @@ export default function piPortableSessionsExtension(pi: ExtensionAPI): void {
       clearWidget();
       return;
     }
-    const sessionsRoot = await getSessionsRoot(agentDir, ctx.cwd);
     const pending = await findPendingMigrations(config, { sessionsRoot });
     if (pending.length === 0) {
       clearWidget();
@@ -208,9 +232,13 @@ export default function piPortableSessionsExtension(pi: ExtensionAPI): void {
     const { config, warnings } = await loadConfig(agentDir, cwd);
     const options = toPortableNameOptions(config);
     const sessionsRoot = await getSessionsRoot(agentDir, cwd);
+    const portableRoot = resolvePortableRoot(
+      config,
+      join(agentDir, "portable-sessions"),
+    );
     const defaultDir = join(sessionsRoot, defaultSessionDirName(cwd));
     const portableName = portableSessionDirName(cwd, options);
-    const portableDir = join(sessionsRoot, portableName);
+    const portableDir = join(portableRoot, portableName);
 
     let defaultState = "does not exist";
     try {
@@ -254,6 +282,10 @@ export default function piPortableSessionsExtension(pi: ExtensionAPI): void {
     const flags = parseMigrateFlags(args);
     const { config, warnings } = await loadConfig(agentDir, ctx.cwd);
     const sessionsRoot = await getSessionsRoot(agentDir, ctx.cwd);
+    const portableRoot = resolvePortableRoot(
+      config,
+      join(agentDir, "portable-sessions"),
+    );
     // Positional arguments name specific session directories to migrate:
     // either absolute working directories or directory names under the
     // sessions root (default `--<encoded-cwd>--` or portable names).
@@ -265,7 +297,7 @@ export default function piPortableSessionsExtension(pi: ExtensionAPI): void {
     const runTargets = async (opts: {
       dryRun?: boolean;
     }): Promise<MigrationResult[]> => {
-      const migrateOpts = { ...opts, sessionsRoot, onJsonlConflict };
+      const migrateOpts = { ...opts, sessionsRoot, portableRoot, onJsonlConflict };
       if (flags.all) {
         return migrateAllSessionDirs(config, migrateOpts);
       }
@@ -289,11 +321,9 @@ export default function piPortableSessionsExtension(pi: ExtensionAPI): void {
     }
 
     const results: MigrationResult[] = [];
-    const deletedOriginals: string[] = [];
 
     if (ctx.hasUI && !flags.yes) {
-      // Walk through each pending migration one at a time: confirm this one,
-      // migrate it, then ask whether to delete the original symlink bridge.
+      // Walk through each pending migration one at a time.
       for (const item of pending) {
         const from = basename(item.defaultDir);
         const to = item.portableName;
@@ -313,22 +343,13 @@ export default function piPortableSessionsExtension(pi: ExtensionAPI): void {
         try {
           result = await migrateSessionDir(item.cwd, config, {
             sessionsRoot,
+            portableRoot,
             onJsonlConflict,
           });
         } finally {
           migrating = false;
         }
         results.push(result);
-        if (result.state === "migrated-now") {
-          const removeOriginal = await ctx.ui.confirm(
-            "Delete the original directory?",
-            `${from}  →  ${to}\n\nThe sessions now live in the portable directory. Delete the\noriginal path (a symlink) as well? Pi recreates it on next startup.`,
-          );
-          if (removeOriginal) {
-            await rm(result.defaultDir);
-            deletedOriginals.push(from);
-          }
-        }
       }
     } else if (flags.yes) {
       // Non-interactive: migrate everything at once, keep the symlink bridges.
@@ -350,11 +371,6 @@ export default function piPortableSessionsExtension(pi: ExtensionAPI): void {
     ctx.ui.setWidget("pi-portable-sessions", undefined);
 
     const lines = [summarize(results, false)];
-    if (deletedOriginals.length > 0) {
-      lines.push(
-        `Deleted original director${deletedOriginals.length === 1 ? "y" : "ies"}: ${deletedOriginals.join(", ")}`,
-      );
-    }
     for (const warning of warnings) {
       lines.push(`Warning: ${warning}`);
     }

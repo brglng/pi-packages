@@ -1,6 +1,6 @@
 {
   "name": "@brglng/pi-portable-sessions",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Portable session directory names for the Pi coding agent: rename the per-project session storage directory to a machine-independent form (home prefix -> HOME, other roots -> ROOT, remainder URL-encoded), so the same project maps to the same directory name across machines.",
   "type": "module",
   "exports": {

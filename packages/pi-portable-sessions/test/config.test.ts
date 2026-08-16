@@ -8,6 +8,7 @@ import {
   loadConfig,
   normalizeConfig,
   type PortableSessionsConfig,
+  resolvePortableRoot,
   toPortableNameOptions,
 } from "#src/config";
 import { getGlobalConfigPath, getProjectConfigPath } from "#src/config-paths";
@@ -225,11 +226,38 @@ describe("toPortableNameOptions", () => {
       rootLabel: "FS",
       extraPrefixes: { "/data": "DATA" },
       notifyOnStart: false,
+      portableRoot: undefined,
     };
     expect(toPortableNameOptions(config)).toEqual({
       homeLabel: "USER",
       rootLabel: "FS",
       extraPrefixes: { "/data": "DATA" },
     });
+  });
+});
+
+
+describe("resolvePortableRoot", () => {
+  it("falls back to the given root when unset", () => {
+    expect(resolvePortableRoot(DEFAULT_CONFIG, "/fallback")).toBe("/fallback");
+  });
+
+  it("expands ~/ notation", () => {
+    const config: PortableSessionsConfig = {
+      ...DEFAULT_CONFIG,
+      portableRoot: "~/portable-sessions",
+    };
+    const resolved = resolvePortableRoot(config, "/fallback");
+    expect(resolved.endsWith("/portable-sessions")).toBe(true);
+    expect(resolved.startsWith("/")).toBe(true);
+  });
+
+  it("resolves relative values against cwd", () => {
+    const config: PortableSessionsConfig = {
+      ...DEFAULT_CONFIG,
+      portableRoot: "portable",
+    };
+    const resolved = resolvePortableRoot(config, "/fallback");
+    expect(resolved).not.toBe("/fallback");
   });
 });

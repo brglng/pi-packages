@@ -26,6 +26,10 @@
       "description": "After Pi starts, notify which session directories can be migrated and the command to run. Default: true",
       "type": "boolean",
       "default": true
+    },
+    "portableRoot": {
+      "description": "Root directory holding the portable session directories (outside Pi's own sessions root). Accepts ~/ notation. Default: <agentDir>/portable-sessions",
+      "type": "string"
     }
   },
   "additionalProperties": false

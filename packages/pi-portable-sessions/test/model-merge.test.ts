@@ -140,6 +140,7 @@ describe("mergeJsonlWithModel as a conflict handler in a real migration", () => 
   it("merges a same-named jsonl conflict end to end without touching the real sessions root", async () => {
     const root = await makeTempDir();
     const sessionsRoot = join(root, "sessions");
+    const portableRoot = join(root, "portable-sessions");
     const cwd = join(root, "project");
     // Reuse the extension's own naming helpers to build the fixture.
     const { defaultSessionDirName } = await import("#src/migrate");
@@ -149,7 +150,7 @@ describe("mergeJsonlWithModel as a conflict handler in a real migration", () => 
 
     const defaultDir = join(sessionsRoot, defaultSessionDirName(cwd));
     const portableDir = join(
-      sessionsRoot,
+      portableRoot,
       portableSessionDirName(cwd, DEFAULT_CONFIG),
     );
     await mkdir(defaultDir, { recursive: true });

@@ -58,6 +58,7 @@ describe("migrateSessionDir", () => {
   it("renames the default directory to the portable name and leaves a symlink", async () => {
     const root = await makeTempDir();
     const sessionsRoot = join(root, "sessions");
+    const portableRoot = join(root, "portable-sessions");
     const cwd = join(root, "project");
     const defaultDir = join(sessionsRoot, defaultSessionDirName(cwd));
     await mkdir(defaultDir, { recursive: true });
@@ -77,6 +78,7 @@ describe("migrateSessionDir", () => {
   it("is idempotent: reports migrated on a second run", async () => {
     const root = await makeTempDir();
     const sessionsRoot = join(root, "sessions");
+    const portableRoot = join(root, "portable-sessions");
     const cwd = join(root, "project");
     const defaultDir = join(sessionsRoot, defaultSessionDirName(cwd));
     await mkdir(defaultDir, { recursive: true });
@@ -90,9 +92,10 @@ describe("migrateSessionDir", () => {
   it("merges into an existing portable directory without overwriting", async () => {
     const root = await makeTempDir();
     const sessionsRoot = join(root, "sessions");
+    const portableRoot = join(root, "portable-sessions");
     const cwd = join(root, "project");
     const defaultDir = join(sessionsRoot, defaultSessionDirName(cwd));
-    const portableDir = join(sessionsRoot, portableSessionDirName(cwd, config));
+    const portableDir = join(portableRoot, portableSessionDirName(cwd, config));
     await mkdir(defaultDir, { recursive: true });
     await mkdir(portableDir, { recursive: true });
     await writeFile(join(defaultDir, "keep.jsonl"), "old\n");
@@ -113,9 +116,10 @@ describe("migrateSessionDir", () => {
   it("reports same-named jsonl conflicts when no conflict handler is given", async () => {
     const root = await makeTempDir();
     const sessionsRoot = join(root, "sessions");
+    const portableRoot = join(root, "portable-sessions");
     const cwd = join(root, "project");
     const defaultDir = join(sessionsRoot, defaultSessionDirName(cwd));
-    const portableDir = join(sessionsRoot, portableSessionDirName(cwd, config));
+    const portableDir = join(portableRoot, portableSessionDirName(cwd, config));
     await mkdir(defaultDir, { recursive: true });
     await mkdir(portableDir, { recursive: true });
     await writeFile(join(defaultDir, "same.jsonl"), "source\n");
@@ -139,9 +143,10 @@ describe("migrateSessionDir", () => {
   it("merges same-named jsonl files through the conflict handler", async () => {
     const root = await makeTempDir();
     const sessionsRoot = join(root, "sessions");
+    const portableRoot = join(root, "portable-sessions");
     const cwd = join(root, "project");
     const defaultDir = join(sessionsRoot, defaultSessionDirName(cwd));
-    const portableDir = join(sessionsRoot, portableSessionDirName(cwd, config));
+    const portableDir = join(portableRoot, portableSessionDirName(cwd, config));
     await mkdir(defaultDir, { recursive: true });
     await mkdir(portableDir, { recursive: true });
     await writeFile(join(defaultDir, "same.jsonl"), "source\n");
@@ -166,9 +171,10 @@ describe("migrateSessionDir", () => {
   it("counts conflicts the handler declines as unmerged", async () => {
     const root = await makeTempDir();
     const sessionsRoot = join(root, "sessions");
+    const portableRoot = join(root, "portable-sessions");
     const cwd = join(root, "project");
     const defaultDir = join(sessionsRoot, defaultSessionDirName(cwd));
-    const portableDir = join(sessionsRoot, portableSessionDirName(cwd, config));
+    const portableDir = join(portableRoot, portableSessionDirName(cwd, config));
     await mkdir(defaultDir, { recursive: true });
     await mkdir(portableDir, { recursive: true });
     await writeFile(join(defaultDir, "same.jsonl"), "source\n");
@@ -192,6 +198,7 @@ describe("migrateSessionDir", () => {
   it("dry run leaves the default directory untouched", async () => {
     const root = await makeTempDir();
     const sessionsRoot = join(root, "sessions");
+    const portableRoot = join(root, "portable-sessions");
     const cwd = join(root, "project");
     const defaultDir = join(sessionsRoot, defaultSessionDirName(cwd));
     await mkdir(defaultDir, { recursive: true });
@@ -210,6 +217,7 @@ describe("migrateSessionDir", () => {
   it("reports no-sessions when the default directory does not exist", async () => {
     const root = await makeTempDir();
     const sessionsRoot = join(root, "sessions");
+    const portableRoot = join(root, "portable-sessions");
     const cwd = join(root, "project");
     const result = await migrateSessionDir(cwd, config, { sessionsRoot });
     expect(result.state).toBe("no-sessions");
@@ -218,8 +226,9 @@ describe("migrateSessionDir", () => {
   it("reports portable-only when only the portable directory exists", async () => {
     const root = await makeTempDir();
     const sessionsRoot = join(root, "sessions");
+    const portableRoot = join(root, "portable-sessions");
     const cwd = join(root, "project");
-    const portableDir = join(sessionsRoot, portableSessionDirName(cwd, config));
+    const portableDir = join(portableRoot, portableSessionDirName(cwd, config));
     await mkdir(portableDir, { recursive: true });
 
     const result = await migrateSessionDir(cwd, config, { sessionsRoot });
@@ -229,6 +238,7 @@ describe("migrateSessionDir", () => {
   it("reports conflict when the default path is a symlink elsewhere", async () => {
     const root = await makeTempDir();
     const sessionsRoot = join(root, "sessions");
+    const portableRoot = join(root, "portable-sessions");
     const cwd = join(root, "project");
     const elsewhere = join(root, "elsewhere");
     await mkdir(elsewhere, { recursive: true });
@@ -264,6 +274,7 @@ describe("migrateAllSessionDirs", () => {
   it("migrates every default-named directory under the sessions root", async () => {
     const root = await makeTempDir();
     const sessionsRoot = join(root, "sessions");
+    const portableRoot = join(root, "portable-sessions");
     const cwdA = join(root, "project-a");
     const cwdB = join(root, "project-b");
     await writeSession(sessionsRoot, cwdA, "20240101_aaa");
@@ -276,7 +287,7 @@ describe("migrateAllSessionDirs", () => {
     for (const cwd of [cwdA, cwdB]) {
       const defaultDir = join(sessionsRoot, defaultSessionDirName(cwd));
       const portableDir = join(
-        sessionsRoot,
+        portableRoot,
         portableSessionDirName(cwd, config),
       );
       const info = await lstat(defaultDir);
@@ -288,6 +299,7 @@ describe("migrateAllSessionDirs", () => {
   it("is idempotent across runs", async () => {
     const root = await makeTempDir();
     const sessionsRoot = join(root, "sessions");
+    const portableRoot = join(root, "portable-sessions");
     const cwd = join(root, "project");
     await writeSession(sessionsRoot, cwd, "20240101_aaa");
 
@@ -317,6 +329,7 @@ describe("findPendingMigrations", () => {
   it("lists default-named directories that are not migrated yet", async () => {
     const root = await makeTempDir();
     const sessionsRoot = join(root, "sessions");
+    const portableRoot = join(root, "portable-sessions");
     const cwdA = join(root, "project-a");
     const cwdB = join(root, "project-b");
     await writeSession(sessionsRoot, cwdA, "20240101_aaa");
@@ -332,6 +345,7 @@ describe("findPendingMigrations", () => {
   it("excludes directories that are already symlinks (migrated)", async () => {
     const root = await makeTempDir();
     const sessionsRoot = join(root, "sessions");
+    const portableRoot = join(root, "portable-sessions");
     const cwd = join(root, "project");
     await writeSession(sessionsRoot, cwd, "20240101_aaa");
     await migrateSessionDir(cwd, config, { sessionsRoot });
@@ -343,6 +357,7 @@ describe("findPendingMigrations", () => {
   it("excludes directories whose portable name already matches", async () => {
     const root = await makeTempDir();
     const sessionsRoot = join(root, "sessions");
+    const portableRoot = join(root, "portable-sessions");
     // A default-named directory whose portable name equals its own name would
     // already be portable; build one via extraPrefixes mapping the whole dir.
     const cwd = join(root, "project");
@@ -379,6 +394,7 @@ describe("migrateNamedSessionDirs", () => {
   it("migrates the named default-named directories", async () => {
     const root = await makeTempDir();
     const sessionsRoot = join(root, "sessions");
+    const portableRoot = join(root, "portable-sessions");
     const cwdA = join(root, "project-a");
     const cwdB = join(root, "project-b");
     const cwdC = join(root, "project-c");
@@ -405,6 +421,7 @@ describe("migrateNamedSessionDirs", () => {
   it("accepts absolute working directory paths", async () => {
     const root = await makeTempDir();
     const sessionsRoot = join(root, "sessions");
+    const portableRoot = join(root, "portable-sessions");
     const cwd = join(root, "project");
     await writeSession(sessionsRoot, cwd, "20240101_aaa");
 
@@ -418,6 +435,7 @@ describe("migrateNamedSessionDirs", () => {
   it("reports and skips unknown directory names", async () => {
     const root = await makeTempDir();
     const sessionsRoot = join(root, "sessions");
+    const portableRoot = join(root, "portable-sessions");
     const results = await migrateNamedSessionDirs(
       ["--does-not-exist--"],
       config,
