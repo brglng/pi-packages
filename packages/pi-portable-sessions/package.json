@@ -1,0 +1,83 @@
+{
+  "name": "@brglng/pi-portable-sessions",
+  "version": "0.1.0",
+  "description": "Portable session directory names for the Pi coding agent: rename the per-project session storage directory to a machine-independent form (home prefix -> HOME, other roots -> ROOT, remainder URL-encoded), so the same project maps to the same directory name across machines.",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/public.d.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "imports": {
+    "#src/*": "./src/*",
+    "#test/*": "./test/*"
+  },
+  "files": [
+    "src",
+    "dist",
+    "config/config.example.json",
+    "schemas/config.schema.json",
+    "README.md",
+    "README.zh.md",
+    "CHANGELOG.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "check": "tsc --noEmit",
+    "build:types": "rollup -c rollup.dts.config.mjs",
+    "prepack": "pnpm run build:types",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint:md": "rumdl check *.md",
+    "lint": "biome check . && pnpm run lint:md"
+  },
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-extension",
+    "pi-coding-agent",
+    "coding-agent",
+    "sessions",
+    "portable",
+    "paths",
+    "directory"
+  ],
+  "author": {
+    "name": "brglng"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/brglng/pi-packages.git",
+    "directory": "packages/pi-portable-sessions"
+  },
+  "homepage": "https://github.com/brglng/pi-packages/tree/main/packages/pi-portable-sessions#readme",
+  "bugs": {
+    "url": "https://github.com/brglng/pi-packages/issues"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "pi": {
+    "extensions": [
+      "./src/index.ts"
+    ]
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": ">=0.79.0"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "catalog:",
+    "@earendil-works/pi-coding-agent": "0.79.1",
+    "@types/node": "catalog:",
+    "rollup": "catalog:",
+    "rollup-plugin-dts": "catalog:",
+    "rumdl": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

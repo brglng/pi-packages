@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema",
+  "title": "PortableSessionsConfig",
+  "description": "Configuration for @brglng/pi-portable-sessions extension. Stored at ~/.pi/agent/extensions/pi-portable-sessions/config.json or .pi/extensions/pi-portable-sessions/config.json per project.",
+  "type": "object",
+  "properties": {
+    "homeLabel": {
+      "description": "Label to replace the home directory prefix with. Default: HOME",
+      "type": "string",
+      "default": "HOME"
+    },
+    "rootLabel": {
+      "description": "Label to replace the root directory prefix (/) with. Default: ROOT",
+      "type": "string",
+      "default": "ROOT"
+    },
+    "extraPrefixes": {
+      "description": "Map of additional absolute path prefixes to portable labels. Longer prefixes are matched first. Entries override the home/root defaults.",
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      },
+      "default": {}
+    },
+    "notifyOnStart": {
+      "description": "After Pi starts, notify which session directories can be migrated and the command to run. Default: true",
+      "type": "boolean",
+      "default": true
+    }
+  },
+  "additionalProperties": false
+}

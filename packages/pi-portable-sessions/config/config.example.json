@@ -1,0 +1,9 @@
+{
+  "$schema": "https://raw.githubusercontent.com/brglng/pi-packages/main/packages/pi-portable-sessions/schemas/config.schema.json",
+  "homeLabel": "HOME",
+  "rootLabel": "ROOT",
+  "extraPrefixes": {
+    "/Volumes/Backup": "BACKUP"
+  },
+  "notifyOnStart": true
+}
