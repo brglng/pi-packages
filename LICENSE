@@ -3,9 +3,8 @@ This repository contains both original code and forked extensions.
 - Original code in this repository (including files added directly by the
   maintainer, e.g. this LICENSE, the root README, and AGENTS.md) is licensed
   under the Mozilla Public License, v. 2.0 (the full text follows below).
-- Forked extensions under `packages/` (currently `pi-permission-system` and
-  `pi-permission-auto-review`) are NOT covered by this MPL-2.0 license. Each
-  such package is licensed under its own `packages/<name>/LICENSE` file
+- Forked extensions under `packages/` are NOT covered by this MPL-2.0 license.
+  Each such package is licensed under its own `packages/<name>/LICENSE` file
   (currently MIT) and retains its upstream copyright holders.
 
 For anything not covered by this LICENSE, see the LICENSE file inside the

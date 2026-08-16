@@ -2,6 +2,8 @@
 
 A collection of Pi coding-agent extensions maintained by brglng.
 
+For a Chinese version of this document, see [README.zh.md](README.zh.md).
+
 ## Packages
 
 | Package | Description | Differences from upstream | Upstream npm package | Upstream repository |
@@ -33,5 +35,3 @@ upstream, list the upstream as `—` and leave the differences column as `—`.
 Original code in this repository is licensed under the [MPL-2.0](LICENSE).
 Forked extensions under `packages/` follow their respective upstream
 licenses, as stated in each package's own `LICENSE` file.
-
-For a Chinese version of this document, see [README.zh.md](README.zh.md).
