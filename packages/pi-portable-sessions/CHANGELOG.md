@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.2.1
+
+- Fix the startup widget lingering in resumed/new/forked sessions: the hint now
+  only appears when Pi actually starts (`session_start` with reason
+  `startup`), and is cleared on any subsequent session entry.
+
+## 0.2.0
+
+- Startup notification now renders as a colored widget above the editor
+  (accent title, green `→` arrows, dim hint) with `→` alignment, instead of a
+  plain text notification.
+- The startup widget is cleared after running `/portable-sessions migrate`.
+
 ## 0.1.0
 
 Initial release.
