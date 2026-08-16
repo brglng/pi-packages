@@ -16,6 +16,8 @@ become `ROOT`, and the remaining path is URL-encoded — so the same project map
 to the same directory name on every machine. That makes session directories
 syncable and shareable across machines.
 
+For a Chinese version of this document, see [README.zh.md](README.zh.md).
+
 ## How it works
 
 Pi hard-codes the `--<encoded-cwd>--` directory name. This extension cannot
@@ -24,8 +26,8 @@ change Pi's internal encoding, so it migrates the directory and leaves a
 
 ```text
 ~/.pi/agent/sessions/
-├── HOME%2Fmy-project/          ← real directory (portable name)
-└── --Users-zpan-my-project--   ← symlink → HOME%2Fmy-project
+├── HOME%2Fmy-project/            ← real directory (portable name)
+└── --Users-brglng-my-project--   ← symlink → HOME%2Fmy-project
 ```
 
 Pi keeps writing through the symlink, so the current session, `/resume`, and
@@ -41,8 +43,8 @@ future startups all keep working while the on-disk name becomes portable.
 
 | Working directory | Portable name |
 |-------------------|---------------|
-| `/Users/zpan/my-project` (home `/Users/zpan`) | `HOME%2Fmy-project` |
-| `/Users/zpan` | `HOME` |
+| `/Users/brglng/my-project` (home `/Users/brglng`) | `HOME%2Fmy-project` |
+| `/Users/brglng` | `HOME` |
 | `/var/www` | `ROOT%2Fvar%2Fwww` |
 | `/Volumes/Backup/data` (with `{"/Volumes/Backup": "BACKUP"}`) | `BACKUP%2Fdata` |
 
@@ -111,8 +113,8 @@ directory name and its portable target:
 
 ```text
 Migrate 2 session directories?
-  --Users-zpan-project-a--  →  HOME%2Fproject-a
-  --var-www--               →  ROOT%2Fvar%2Fwww
+  --Users-brglng-project-a--  →  HOME%2Fproject-a
+  --var-www--                 →  ROOT%2Fvar%2Fwww
 ```
 
 While the migration runs, Pi blocks session operations (`/new`, `/resume`,
@@ -152,4 +154,4 @@ to run (`/portable-sessions migrate` for the current project, or
 
 ## License
 
-MIT
+MPL-2.0

@@ -6,7 +6,7 @@
 默认情况下，Pi 会把每个项目的 session 存放在以「编码后的工作目录」命名的子目录中：
 
 ```text
-~/.pi/agent/sessions/--Users-zpan-my-project--/20240816_1234abcd.jsonl
+~/.pi/agent/sessions/--Users-brglng-my-project--/20240816_1234abcd.jsonl
 ```
 
 目录名里嵌入了绝对路径，因此在不同的机器上各不相同（用户名不同、
@@ -22,8 +22,8 @@ Pi 硬编码了 `--<encoded-cwd>--` 目录名，本扩展无法修改 Pi 内部�
 
 ```text
 ~/.pi/agent/sessions/
-├── HOME%2Fmy-project/          ← 真实目录（可移植名）
-└── --Users-zpan-my-project--   ← symlink → HOME%2Fmy-project
+├── HOME%2Fmy-project/            ← 真实目录（可移植名）
+└── --Users-brglng-my-project--   ← symlink → HOME%2Fmy-project
 ```
 
 Pi 会继续通过符号链接写入，因此当前 session、`/resume` 以及之后的每次启动都照常工作，而磁盘上的目录名已经变成可移植形式。
@@ -37,8 +37,8 @@ Pi 会继续通过符号链接写入，因此当前 session、`/resume` 以及�
 
 | 工作目录 | 可移植名 |
 |-------------------|---------------|
-| `/Users/zpan/my-project`（家目录 `/Users/zpan`） | `HOME%2Fmy-project` |
-| `/Users/zpan` | `HOME` |
+| `/Users/brglng/my-project`（家目录 `/Users/brglng`） | `HOME%2Fmy-project` |
+| `/Users/brglng` | `HOME` |
 | `/var/www` | `ROOT%2Fvar%2Fwww` |
 | `/Volumes/Backup/data`（配置了 `{"/Volumes/Backup": "BACKUP"}`） | `BACKUP%2Fdata` |
 
@@ -106,8 +106,8 @@ session 根目录不在配置中：它由 Pi 自身解析，优先级与 Pi 一�
 
 ```text
 Migrate 2 session directories?
-  --Users-zpan-project-a--  →  HOME%2Fproject-a
-  --var-www--               →  ROOT%2Fvar%2Fwww
+  --Users-brglng-project-a--  →  HOME%2Fproject-a
+  --var-www--                 →  ROOT%2Fvar%2Fwww
 ```
 
 迁移期间，Pi 会阻止 session 操作（`/new`、`/resume`、`/fork`、`/tree`、
@@ -140,4 +140,4 @@ migrate`，全部迁移用 `/portable-sessions migrate --all`）。可在配置�
 
 ## License
 
-MIT
+MPL-2.0
