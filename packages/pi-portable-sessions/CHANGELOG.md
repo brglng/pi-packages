@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.3.0
+
+- Interactive `migrate` now walks each pending migration one at a time: confirm
+  a single rename, migrate it, then ask whether to delete the original symlink
+  bridge, before moving on to the next one.
+- `--yes` (non-interactive) still migrates everything at once and keeps the
+  symlink bridges.
+
+## 0.2.3
+
+- Collapse "no sessions" rows for directories with no readable session header
+  into a single summary line, so `migrate --all` no longer reports noisy
+  per-directory skips alongside real migrations.
+
 ## 0.2.2
 
 - Align the `→` arrows in the migration confirmation dialog by padding the

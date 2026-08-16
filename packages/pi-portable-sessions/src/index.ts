@@ -1,4 +1,4 @@
-import { stat } from "node:fs/promises";
+import { rm, stat } from "node:fs/promises";
 import { basename, join } from "node:path";
 import type {
   ExtensionAPI,
@@ -40,7 +40,17 @@ function stateLabel(state: MigrationState): string {
 }
 
 function summarize(results: MigrationResult[], dryRun: boolean): string {
-  const lines = results.map((result) => {
+  // Directories Pi scanned that could not be attributed to a working directory
+  // (no session file with a cwd header, e.g. empty dirs created by running Pi
+  // outside a real project) are not worth a per-directory line: collapse them
+  // into a single summary count instead of noisy "no sessions" rows.
+  const skipped = results.filter(
+    (result) => result.state === "no-sessions" && result.portableName === "",
+  );
+  const rest = results.filter(
+    (result) => !(result.state === "no-sessions" && result.portableName === ""),
+  );
+  const lines = rest.map((result) => {
     const name = result.portableName || "<n/a>";
     const note = result.note ? ` — ${result.note}` : "";
     let conflicts = "";
@@ -52,8 +62,13 @@ function summarize(results: MigrationResult[], dryRun: boolean): string {
     }
     return `  ${stateLabel(result.state)}: ${name}${conflicts}${note}`;
   });
+  if (skipped.length > 0) {
+    lines.push(
+      `  ${skipped.length} director${skipped.length === 1 ? "y" : "ies"} skipped (no session files with a cwd header)`,
+    );
+  }
   const verb = dryRun ? "Would migrate" : "Migrated";
-  return `${verb} ${results.length} session director${results.length === 1 ? "y" : "ies"}:\n${lines.join("\n")}`;
+  return `${verb} ${rest.length} session director${rest.length === 1 ? "y" : "ies"}:\n${lines.join("\n")}`;
 }
 
 interface MigrateFlags {
@@ -243,28 +258,21 @@ export default function piPortableSessionsExtension(pi: ExtensionAPI): void {
     // either absolute working directories or directory names under the
     // sessions root (default `--<encoded-cwd>--` or portable names).
     const targets = args.filter((arg) => !arg.startsWith("--"));
+    const onJsonlConflict: JsonlConflictHandler = (source, target) =>
+      mergeJsonlWithModel(source, target, {
+        exec: (command, args, options) => pi.exec(command, args, options),
+      });
     const runTargets = async (opts: {
       dryRun?: boolean;
-      onJsonlConflict?: JsonlConflictHandler;
     }): Promise<MigrationResult[]> => {
+      const migrateOpts = { ...opts, sessionsRoot, onJsonlConflict };
       if (flags.all) {
-        return migrateAllSessionDirs(config, {
-          ...opts,
-          sessionsRoot,
-        });
+        return migrateAllSessionDirs(config, migrateOpts);
       }
       if (targets.length > 0) {
-        return migrateNamedSessionDirs(targets, config, {
-          ...opts,
-          sessionsRoot,
-        });
+        return migrateNamedSessionDirs(targets, config, migrateOpts);
       }
-      return [
-        await migrateSessionDir(ctx.cwd, config, {
-          ...opts,
-          sessionsRoot,
-        }),
-      ];
+      return [await migrateSessionDir(ctx.cwd, config, migrateOpts)];
     };
     // Plan first (dry run): decide what would change before asking.
     const plan = await runTargets({ dryRun: true });
@@ -280,24 +288,57 @@ export default function piPortableSessionsExtension(pi: ExtensionAPI): void {
       return;
     }
 
+    const results: MigrationResult[] = [];
+    const deletedOriginals: string[] = [];
+
     if (ctx.hasUI && !flags.yes) {
-      const width = Math.max(
-        ...pending.map((result) => basename(result.defaultDir).length),
-      );
-      const lines = pending.map((result) => {
-        const from = basename(result.defaultDir).padEnd(width);
-        const to = result.portableName;
-        return `  ${from}  →  ${to}`;
-      });
-      const ok = await ctx.ui.confirm(
-        `Migrate ${pending.length} session director${pending.length === 1 ? "y" : "ies"}?`,
-        lines.join("\n"),
-      );
-      if (!ok) {
-        ctx.ui.notify("Migration cancelled.", "info");
-        return;
+      // Walk through each pending migration one at a time: confirm this one,
+      // migrate it, then ask whether to delete the original symlink bridge.
+      for (const item of pending) {
+        const from = basename(item.defaultDir);
+        const to = item.portableName;
+        const ok = await ctx.ui.confirm(
+          "Migrate session directory?",
+          `  ${from}  →  ${to}`,
+        );
+        if (!ok) {
+          ctx.ui.notify(
+            `Cancelled after ${results.length} director${results.length === 1 ? "y" : "ies"} migrated.`,
+            "info",
+          );
+          break;
+        }
+        migrating = true;
+        let result: MigrationResult;
+        try {
+          result = await migrateSessionDir(item.cwd, config, {
+            sessionsRoot,
+            onJsonlConflict,
+          });
+        } finally {
+          migrating = false;
+        }
+        results.push(result);
+        if (result.state === "migrated-now") {
+          const removeOriginal = await ctx.ui.confirm(
+            "Delete the original directory?",
+            `${from}  →  ${to}\n\nThe sessions now live in the portable directory. Delete the\noriginal path (a symlink) as well? Pi recreates it on next startup.`,
+          );
+          if (removeOriginal) {
+            await rm(result.defaultDir);
+            deletedOriginals.push(from);
+          }
+        }
       }
-    } else if (!ctx.hasUI && !flags.yes) {
+    } else if (flags.yes) {
+      // Non-interactive: migrate everything at once, keep the symlink bridges.
+      migrating = true;
+      try {
+        results.push(...(await runTargets({})));
+      } finally {
+        migrating = false;
+      }
+    } else {
       ctx.ui.notify(
         "Confirmation requires TUI mode; pass --yes to run without confirmation.",
         "warning",
@@ -305,22 +346,15 @@ export default function piPortableSessionsExtension(pi: ExtensionAPI): void {
       return;
     }
 
-    migrating = true;
-    const onJsonlConflict: JsonlConflictHandler = (source, target) =>
-      mergeJsonlWithModel(source, target, {
-        exec: (command, args, options) => pi.exec(command, args, options),
-      });
-    let results: MigrationResult[];
-    try {
-      results = await runTargets({ onJsonlConflict });
-    } finally {
-      migrating = false;
-    }
-
     // The startup widget may be stale now; clear it.
     ctx.ui.setWidget("pi-portable-sessions", undefined);
 
     const lines = [summarize(results, false)];
+    if (deletedOriginals.length > 0) {
+      lines.push(
+        `Deleted original director${deletedOriginals.length === 1 ? "y" : "ies"}: ${deletedOriginals.join(", ")}`,
+      );
+    }
     for (const warning of warnings) {
       lines.push(`Warning: ${warning}`);
     }
