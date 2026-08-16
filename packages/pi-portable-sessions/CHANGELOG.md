@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.2.2
+
+- Align the `→` arrows in the migration confirmation dialog by padding the
+  source directory names to a fixed width.
+
 ## 0.2.1
 
 - Fix the startup widget lingering in resumed/new/forked sessions: the hint now

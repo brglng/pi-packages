@@ -281,8 +281,11 @@ export default function piPortableSessionsExtension(pi: ExtensionAPI): void {
     }
 
     if (ctx.hasUI && !flags.yes) {
+      const width = Math.max(
+        ...pending.map((result) => basename(result.defaultDir).length),
+      );
       const lines = pending.map((result) => {
-        const from = basename(result.defaultDir);
+        const from = basename(result.defaultDir).padEnd(width);
         const to = result.portableName;
         return `  ${from}  →  ${to}`;
       });
