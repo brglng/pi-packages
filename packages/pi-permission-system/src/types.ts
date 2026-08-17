@@ -47,18 +47,7 @@ export interface PermissionCheckResult {
   /** Custom denial reason from a deny-with-reason pattern, when present. */
   reason?: string;
   matchedPattern?: string;
-  /**
-   * The offending command unit that produced this result. For a chained shell
-   * program (e.g. `cd x && git commit`) this is only the matched sub-command
-   * (e.g. `cd x`) — use {@link fullCommand} for the whole program.
-   */
   command?: string;
-  /**
-   * The full shell program the result was derived from, including every
-   * chained unit (e.g. `cd x && git commit -m "..."`). Absent when the check
-   * was not bash-shaped (MCP, path-bearing, plain tool).
-   */
-  fullCommand?: string;
   target?: string;
   source: "tool" | "bash" | "mcp" | "skill" | "special" | "default" | "session";
   /** Which source contributed the winning rule. */
@@ -69,6 +58,12 @@ export interface PermissionCheckResult {
    * (top-level) commands.
    */
   commandContext?: BashCommandContext;
+  /**
+   * The command the winning bash unit actually runs, when it is a wrapper whose
+   * inner command differs from the unit text (#713). Display-only: the gate
+   * still decides on `command`, so this never widens or narrows a decision.
+   */
+  executedUnit?: string;
 }
 
 export function isPermissionState(value: unknown): value is PermissionState {

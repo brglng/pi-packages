@@ -2,8 +2,8 @@ import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 import type { PermissionPromptDecision } from "#src/authority/permission-dialog";
 import type { PermissionQuery } from "#src/service";
 import {
-  type Authorizer,
   type AuthorizerSelectionDeps,
+  type NamedAuthorizer,
   type SelectedAuthority,
   selectAuthorizer,
 } from "./authorizer";
@@ -93,7 +93,7 @@ export class AuthorizerSelection
   private linksFor(
     authority: SelectedAuthority,
     requestId: string,
-  ): Authorizer[] {
+  ): NamedAuthorizer[] {
     const configured = this.deps.getAuthorizerChain();
     if (configured.length === 0) {
       return [];
@@ -123,8 +123,8 @@ export class AuthorizerSelection
   private resolveConfiguredLinks(
     configured: readonly string[],
     requestId: string,
-  ): Authorizer[] {
-    const links: Authorizer[] = [];
+  ): NamedAuthorizer[] {
+    const links: NamedAuthorizer[] = [];
     const resolved: string[] = [];
     for (const name of configured) {
       const authorize = this.deps.authorizerRegistry.get(name);
@@ -136,7 +136,7 @@ export class AuthorizerSelection
         continue;
       }
       resolved.push(name);
-      links.push({ authorize: encloseInDelegationEnvelope(authorize) });
+      links.push({ name, authorize: encloseInDelegationEnvelope(authorize) });
     }
     if (resolved.length > 0) {
       this.deps.logger.review("authorizer_chain_resolved", {

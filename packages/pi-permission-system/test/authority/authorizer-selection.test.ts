@@ -23,6 +23,8 @@ import {
   registerLink as register,
 } from "#test/helpers/authorizer-fixtures";
 import { makeAuthorizerLog } from "#test/helpers/authorizer-log-fixtures";
+import { DECIDED_BY_HUMAN } from "#test/helpers/decision-fixtures";
+import { makePromptDetails as makeDetails } from "#test/helpers/prompt-details-fixtures";
 
 // ── Test helpers ──────────────────────────────────────────────────────────
 
@@ -46,21 +48,11 @@ function makeCtx(overrides: Partial<ExtensionContext> = {}): ExtensionContext {
   } as unknown as ExtensionContext;
 }
 
-function makeDetails(): PromptPermissionDetails {
-  return {
-    requestId: "req-1",
-    source: "tool_call",
-    agentName: null,
-    message: "Allow this?",
-  };
-}
-
 /** Details whose gate-computed surface drives the delegation envelope. */
 function makeDetailsOn(surface: string): PromptPermissionDetails {
-  return {
-    ...makeDetails(),
+  return makeDetails({
     accessIntent: { surface, matchValues: ["/v"], boundaryValue: null },
-  };
+  });
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────────
@@ -87,7 +79,11 @@ describe("AuthorizerSelection", () => {
         expect.any(LocalUserAuthorizer),
         details,
       );
-      expect(result).toEqual({ approved: true, state: "approved" });
+      expect(result).toEqual({
+        approved: true,
+        state: "approved",
+        decidedBy: DECIDED_BY_HUMAN,
+      });
     });
 
     it("uses the most recently selected authorizer", async () => {
@@ -117,6 +113,7 @@ describe("AuthorizerSelection", () => {
       const decision: PermissionPromptDecision = {
         approved: false,
         state: "denied",
+        decidedBy: DECIDED_BY_HUMAN,
         denialReason: "user declined",
       };
       const prompter = makePrompterApi();
@@ -173,6 +170,12 @@ describe("AuthorizerSelection", () => {
         approved: false,
         state: "denied_with_reason",
         denialReason: "typo path",
+        decidedBy: {
+          kind: "authorizer",
+          name: "judge",
+          verdict: "deny",
+          reason: "typo path",
+        },
       });
     });
 
@@ -223,6 +226,12 @@ describe("AuthorizerSelection", () => {
         approved: false,
         state: "denied_with_reason",
         denialReason: "a-wins",
+        decidedBy: {
+          kind: "authorizer",
+          name: "a",
+          verdict: "deny",
+          reason: "a-wins",
+        },
       });
     });
 
@@ -245,11 +254,18 @@ describe("AuthorizerSelection", () => {
 
       const decision = await selection.escalate(makeDetailsOn("bash"));
 
-      // The unregistered "missing" link is skipped fail-safe; "present" decides.
+      // The unregistered "missing" link is skipped fail-safe; "present"
+      // decides, and is the name credited — the skipped one is not.
       expect(decision).toEqual({
         approved: false,
         state: "denied_with_reason",
         denialReason: "present-decided",
+        decidedBy: {
+          kind: "authorizer",
+          name: "present",
+          verdict: "deny",
+          reason: "present-decided",
+        },
       });
       expect(logger.review).toHaveBeenCalledWith(
         "authorizer_chain_unregistered_link",
@@ -362,7 +378,16 @@ describe("AuthorizerSelection", () => {
 
       // bash is not excluded, so the link's allow stands (a non-persistent
       // approved grant) — the denying terminal is never reached.
-      expect(decision).toEqual({ approved: true, state: "approved" });
+      expect(decision).toEqual({
+        approved: true,
+        state: "approved",
+        decidedBy: {
+          kind: "authorizer",
+          name: "judge",
+          verdict: "allow",
+          reason: null,
+        },
+      });
     });
 
     it("a registered but un-named link grants no authority (terminal identity)", async () => {

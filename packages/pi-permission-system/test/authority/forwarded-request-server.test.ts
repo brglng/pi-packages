@@ -22,6 +22,7 @@ import {
   registerLink,
 } from "#test/helpers/authorizer-fixtures";
 import { makeAuthorizerLog } from "#test/helpers/authorizer-log-fixtures";
+import { DECIDED_BY_HUMAN } from "#test/helpers/decision-fixtures";
 import {
   createForwardingTempDir,
   type ForwardingTempDir,
@@ -31,6 +32,7 @@ import {
   makeSubagentRegistry,
 } from "#test/helpers/forwarding-fixtures";
 import { makeCheckResult } from "#test/helpers/handler-fixtures";
+import { makePromptPayload } from "#test/helpers/prompt-details-fixtures";
 
 let temp: ForwardingTempDir | undefined;
 
@@ -67,6 +69,7 @@ function makeCapturingEscalator() {
       return Promise.resolve<PermissionPromptDecision>({
         approved: true,
         state: "approved",
+        decidedBy: DECIDED_BY_HUMAN,
       });
     }),
     /** The details of the most recent escalation. */
@@ -116,7 +119,13 @@ describe("processInbox — recorded-authority resolution", () => {
       accessIntent,
     });
 
-    const resolve = vi.fn(() => makeCheckResult({ state: "allow" }));
+    const resolve = vi.fn(() =>
+      makeCheckResult({
+        state: "allow",
+        matchedPattern: "git *",
+        origin: "global",
+      }),
+    );
     const escalate = vi.fn();
     const logger = { review: vi.fn(), debug: vi.fn() };
 
@@ -135,13 +144,24 @@ describe("processInbox — recorded-authority resolution", () => {
 
     expect(resolve).toHaveBeenCalledWith(accessIntent);
     expect(escalate).not.toHaveBeenCalled();
+    // The serving node's own rule decided, and the response names it: the
+    // child's log entry would otherwise say only that the parent approved.
     expect(readResponse(temp, "req-allow")).toMatchObject({
       approved: true,
       state: "approved",
+      decidedBy: {
+        kind: "rule",
+        surface: "bash",
+        pattern: "git *",
+        origin: "global",
+      },
     });
     expect(logger.review).toHaveBeenCalledWith(
       "forwarded_permission.auto_approved",
-      expect.objectContaining({ requestId: "req-allow" }),
+      expect.objectContaining({
+        requestId: "req-allow",
+        decidedBy: expect.objectContaining({ kind: "rule" }),
+      }),
     );
   });
 
@@ -158,7 +178,13 @@ describe("processInbox — recorded-authority resolution", () => {
       accessIntent,
     });
 
-    const resolve = vi.fn(() => makeCheckResult({ state: "deny" }));
+    const resolve = vi.fn(() =>
+      makeCheckResult({
+        state: "deny",
+        matchedPattern: "rm *",
+        origin: "project",
+      }),
+    );
     const escalate = vi.fn();
     const logger = { review: vi.fn(), debug: vi.fn() };
 
@@ -180,11 +206,72 @@ describe("processInbox — recorded-authority resolution", () => {
     expect(readResponse(temp, "req-deny")).toMatchObject({
       approved: false,
       state: "denied",
+      decidedBy: {
+        kind: "rule",
+        surface: "bash",
+        pattern: "rm *",
+        origin: "project",
+      },
     });
     expect(logger.review).toHaveBeenCalledWith(
       "forwarded_permission.auto_denied",
-      expect.objectContaining({ requestId: "req-deny" }),
+      expect.objectContaining({
+        requestId: "req-deny",
+        decidedBy: expect.objectContaining({ kind: "rule" }),
+      }),
     );
+  });
+
+  test("relays the escalated decision's own decider onto the response", async () => {
+    temp = createForwardingTempDir("parent-session");
+    temp.writeRequest({ id: "req-human", accessIntent: undefined });
+
+    const server = new ForwardedRequestServer(
+      makeServerDeps({
+        forwardingDir: temp.forwardingDir,
+        escalator: {
+          escalate: vi.fn().mockResolvedValue({
+            approved: true,
+            state: "approved",
+            decidedBy: { kind: "user", via: "dialog" },
+          }),
+        },
+      }),
+    );
+
+    await server.processInbox(
+      makeForwarderContext({ hasUI: true, sessionId: "parent-session" }),
+    );
+
+    // This is the reported case: the child could not tell a human approval at
+    // the parent from the parent's policy auto-approving on its behalf.
+    expect(readResponse(temp, "req-human")).toMatchObject({
+      decidedBy: { kind: "user", via: "dialog" },
+    });
+  });
+
+  test("attributes a failed escalation to the error, not to a denial anyone made", async () => {
+    temp = createForwardingTempDir("parent-session");
+    temp.writeRequest({ id: "req-boom", accessIntent: undefined });
+
+    const server = new ForwardedRequestServer(
+      makeServerDeps({
+        forwardingDir: temp.forwardingDir,
+        escalator: {
+          escalate: vi.fn().mockRejectedValue(new Error("prompt exploded")),
+        },
+      }),
+    );
+
+    await server.processInbox(
+      makeForwarderContext({ hasUI: true, sessionId: "parent-session" }),
+    );
+
+    expect(readResponse(temp, "req-boom")).toMatchObject({
+      approved: false,
+      state: "denied",
+      decidedBy: { kind: "gate_error", reason: "prompt exploded" },
+    });
   });
 
   test("escalates an ask through the AskEscalator with the forwarded provenance details", async () => {
@@ -198,12 +285,23 @@ describe("processInbox — recorded-authority resolution", () => {
       surface: "bash",
       value: "git push",
       accessIntent,
+      payload: makePromptPayload({
+        kind: "bash",
+        request: {
+          ...makePromptPayload().request,
+          surface: "bash",
+          toolName: "bash",
+          value: "git push",
+        },
+      }),
     });
 
     const resolve = vi.fn(() => makeCheckResult({ state: "ask" }));
-    const escalate = vi
-      .fn()
-      .mockResolvedValue({ approved: true, state: "approved" });
+    const escalate = vi.fn().mockResolvedValue({
+      approved: true,
+      state: "approved",
+      decidedBy: DECIDED_BY_HUMAN,
+    });
 
     const server = new ForwardedRequestServer(
       makeServerDeps({
@@ -222,8 +320,6 @@ describe("processInbox — recorded-authority resolution", () => {
       requestId: "req-ask",
       source: "tool_call",
       agentName: "Explore",
-      message:
-        "Subagent 'Explore' requested permission.\nSession ID: child-session\n\nAllow git push?",
       surface: "bash",
       value: "git push",
       forwarding: {
@@ -235,11 +331,66 @@ describe("processInbox — recorded-authority resolution", () => {
         matchValues: ["git push"],
         boundaryValue: null,
       },
+      payload: {
+        kind: "bash",
+        request: {
+          requester: {
+            agentName: "Explore",
+            forwarded: true,
+            sessionId: "child-session",
+          },
+          surface: "bash",
+          toolName: "bash",
+          invokedToolName: null,
+          value: "git push",
+          matchedPattern: null,
+          commandContext: null,
+          executedUnit: null,
+        },
+        evidence: [],
+        annotations: [],
+      },
     });
     expect(readResponse(temp, "req-ask")).toMatchObject({
       approved: true,
       state: "approved",
     });
+  });
+
+  test("keeps requester cwd and principal out of the escalated payload (#635)", async () => {
+    temp = createForwardingTempDir("parent-session");
+    temp.writeRequest({
+      id: "req-ask",
+      surface: "bash",
+      value: "git push",
+      accessIntent: makeForwardedAccessIntent({
+        requesterCwd: "/child/cwd",
+        principal: { sessionId: "child-session", agentName: "Explore" },
+      }),
+    });
+
+    const escalate = vi.fn().mockResolvedValue({
+      approved: true,
+      state: "approved",
+      decidedBy: DECIDED_BY_HUMAN,
+    });
+    const server = new ForwardedRequestServer(
+      makeServerDeps({
+        forwardingDir: temp.forwardingDir,
+        policy: { resolve: () => makeCheckResult({ state: "ask" }) },
+        escalator: { escalate },
+      }),
+    );
+
+    await server.processInbox(
+      makeForwarderContext({ hasUI: true, sessionId: "parent-session" }),
+    );
+
+    // The payload is a disclosure boundary too: requester identity reaches an
+    // Authorizer through `details.forwarding`, never smuggled in as evidence.
+    const serialized = JSON.stringify(escalate.mock.calls[0][0].payload);
+    expect(serialized).not.toContain("/child/cwd");
+    expect(serialized).not.toContain("principal");
   });
 
   test("floors a request with no fields at all (fully legacy) to escalation without consulting the policy", async () => {
@@ -248,9 +399,11 @@ describe("processInbox — recorded-authority resolution", () => {
     temp.writeRequest({ id: "req-legacy" });
 
     const resolve = vi.fn(() => makeCheckResult({ state: "allow" }));
-    const escalate = vi
-      .fn()
-      .mockResolvedValue({ approved: true, state: "approved" });
+    const escalate = vi.fn().mockResolvedValue({
+      approved: true,
+      state: "approved",
+      decidedBy: DECIDED_BY_HUMAN,
+    });
 
     const server = new ForwardedRequestServer(
       makeServerDeps({
@@ -288,9 +441,11 @@ describe("processInbox — recorded-authority resolution", () => {
     });
 
     const resolve = vi.fn(() => makeCheckResult({ state: "allow" }));
-    const escalate = vi
-      .fn()
-      .mockResolvedValue({ approved: true, state: "approved" });
+    const escalate = vi.fn().mockResolvedValue({
+      approved: true,
+      state: "approved",
+      decidedBy: DECIDED_BY_HUMAN,
+    });
 
     const server = new ForwardedRequestServer(
       makeServerDeps({
@@ -402,6 +557,89 @@ describe("processInbox — child-fixed access facts on the escalated ask", () =>
   });
 });
 
+describe("processInbox — the child's payload on the escalated ask", () => {
+  test("escalates the child's own payload with the requester re-stamped as forwarded", async () => {
+    const childPayload = makePromptPayload({
+      kind: "bash",
+      request: {
+        requester: { agentName: "Explore", forwarded: false, sessionId: null },
+        surface: "bash",
+        toolName: "bash",
+        invokedToolName: null,
+        value: "git push",
+        matchedPattern: "git *",
+        commandContext: null,
+        executedUnit: null,
+      },
+      evidence: [
+        { label: "full command", text: "git push --force", detail: null },
+      ],
+    });
+
+    const details = await escalateForwardedAsk({
+      id: "req-child-payload",
+      requesterAgentName: "Explore",
+      requesterSessionId: "child-session",
+      source: "tool_call",
+      surface: "bash",
+      value: "git push",
+      payload: childPayload,
+    });
+
+    // The child's kind and facts pass through untouched — a forwarded bash ask
+    // renders `command : …` exactly as a local one does. Only the requester is
+    // re-stamped: the serving node is the only party that knows the ask arrived
+    // over the wire, and the request's own provenance is authoritative (#292).
+    expect(details.payload).toEqual({
+      ...childPayload,
+      request: {
+        ...childPayload.request,
+        requester: {
+          agentName: "Explore",
+          forwarded: true,
+          sessionId: "child-session",
+        },
+      },
+    });
+  });
+
+  test("escalates a degraded forwarded payload for a request carrying none", async () => {
+    const details = await escalateForwardedAsk({
+      id: "req-skew-payload",
+      requesterAgentName: "scout",
+      requesterSessionId: "child-session",
+      source: "tool_call",
+      surface: "read",
+      value: "/tmp/x",
+      // `JSON.stringify` drops the key, so the written request genuinely
+      // carries no payload — an older child's request.
+      payload: undefined,
+    });
+
+    // `kind: "forwarded"` now means exactly one thing: this ask arrived without
+    // a payload, so it is rendered from the display fields it does carry.
+    expect(details.payload).toEqual({
+      kind: "forwarded",
+      request: {
+        requester: {
+          agentName: "scout",
+          forwarded: true,
+          sessionId: "child-session",
+        },
+        surface: "read",
+        toolName: null,
+        invokedToolName: null,
+        value: "/tmp/x",
+        matchedPattern: null,
+        commandContext: null,
+        executedUnit: null,
+      },
+      evidence: [],
+      annotations: [],
+    });
+  });
+});
+
 describe("processInbox — bounded delegation over forwarded asks", () => {
   const query: PermissionQuery = {
     checkPermission: vi.fn(),
@@ -473,9 +711,11 @@ describe("processInbox — the serving node's chain adjudicates a forwarded ask"
       kind: "deny",
       reason: "destructive",
     });
-    const requestPermissionDecision = vi
-      .fn()
-      .mockResolvedValue({ approved: true, state: "approved" });
+    const requestPermissionDecision = vi.fn().mockResolvedValue({
+      approved: true,
+      state: "approved",
+      decidedBy: DECIDED_BY_HUMAN,
+    });
     const logger = makeAuthorizerLog();
     // The real chain owner, wired exactly as index.ts wires it: the same
     // AuthorizerSelection is both the gate's AskEscalator and the forwarded
@@ -505,13 +745,20 @@ describe("processInbox — the serving node's chain adjudicates a forwarded ask"
     );
 
     // The link's deny is what the child receives, and the human terminal was
-    // never reached — the chain adjudicated the forwarded ask.
+    // never reached — the chain adjudicated the forwarded ask. The child can
+    // now see that from its own record: the link is named on the wire.
     expect(readResponse(temp, "req-chain")).toEqual({
       approved: false,
       state: "denied_with_reason",
       denialReason: "destructive",
       responderSessionId: "parent-session",
       respondedAt: expect.any(Number),
+      decidedBy: {
+        kind: "authorizer",
+        name: "model-judge",
+        verdict: "deny",
+        reason: "destructive",
+      },
     });
     expect(requestPermissionDecision).not.toHaveBeenCalled();
   });
@@ -533,6 +780,7 @@ describe("processInbox — grant-scope selection", () => {
     const escalate = vi.fn().mockResolvedValue({
       approved: true,
       state: "approved_for_serving_session",
+      decidedBy: { kind: "user", via: "dialog" },
     });
     const recordSessionApproval = vi.fn();
 
@@ -553,9 +801,11 @@ describe("processInbox — grant-scope selection", () => {
       expect.objectContaining({ surface: "bash", patterns: ["git *"] }),
     );
     // Translated: the child receives a plain approve and records nothing.
+    // The translation rewrites the scope, never the decider.
     expect(readResponse(temp, "req-whole")).toMatchObject({
       approved: true,
       state: "approved",
+      decidedBy: { kind: "user", via: "dialog" },
     });
   });
 
@@ -571,9 +821,11 @@ describe("processInbox — grant-scope selection", () => {
     });
 
     const resolve = vi.fn(() => makeCheckResult({ state: "ask" }));
-    const escalate = vi
-      .fn()
-      .mockResolvedValue({ approved: true, state: "approved" });
+    const escalate = vi.fn().mockResolvedValue({
+      approved: true,
+      state: "approved",
+      decidedBy: DECIDED_BY_HUMAN,
+    });
 
     const server = new ForwardedRequestServer(
       makeServerDeps({
@@ -606,9 +858,11 @@ describe("processInbox — grant-scope selection", () => {
     });
 
     const resolve = vi.fn(() => makeCheckResult({ state: "ask" }));
-    const escalate = vi
-      .fn()
-      .mockResolvedValue({ approved: true, state: "approved_for_session" });
+    const escalate = vi.fn().mockResolvedValue({
+      approved: true,
+      state: "approved_for_session",
+      decidedBy: DECIDED_BY_HUMAN,
+    });
     const recordSessionApproval = vi.fn();
 
     const server = new ForwardedRequestServer(

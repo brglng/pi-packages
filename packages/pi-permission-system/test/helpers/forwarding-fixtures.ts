@@ -22,18 +22,27 @@ import type { ParentAuthorizerDeps } from "#src/authority/approval-escalator";
 import type { ForwardedRequestServerDeps } from "#src/authority/forwarded-request-server";
 import type { ForwarderContext } from "#src/authority/forwarder-context";
 import {
+  ForwardingLivenessJudge,
+  ServingHeartbeatStore,
+  type TargetServingLookup,
+} from "#src/authority/forwarding-liveness";
+import {
   createPermissionForwardingLocation,
   type ForwardedAccessIntent,
   type ForwardedPermissionRequest,
   PERMISSION_FORWARDING_TIMEOUT_MS,
   type PermissionForwardingLocation,
 } from "#src/authority/permission-forwarding";
-import type { ServingLookup } from "#src/authority/serving-registry";
+import {
+  type ServingLookup,
+  ServingSessionRegistry,
+} from "#src/authority/serving-registry";
 import {
   type SubagentSessionInfo,
   SubagentSessionRegistry,
 } from "#src/authority/subagent-registry";
 import { makeCheckResult } from "#test/helpers/handler-fixtures";
+import { makePromptPayload } from "#test/helpers/prompt-details-fixtures";
 
 /** Handle over a temp forwarding directory; register `cleanup` in `afterEach`. */
 export interface ForwardingTempDir {
@@ -77,7 +86,7 @@ export function createForwardingTempDir(
         requesterSessionId: "child-session",
         targetSessionId: sessionId,
         requesterAgentName: "Explore",
-        message: "Allow git push?",
+        payload: makePromptPayload(),
         ...overrides,
       };
       writeFileSync(
@@ -125,9 +134,9 @@ export function makeServerDeps(
  * (from `createForwardingTempDir` and `makeSubagentRegistry`); everything else
  * defaults so a new dep lands here once rather than at every construction site.
  *
- * `serving` defaults to a registry that reports every session as serving, so a
+ * `serving` defaults to a lookup that reports every target as serving, so a
  * test exercising the ordinary round trip is not accidentally fast-failed; a
- * test targeting the unserved path passes an empty `ServingSessionRegistry`.
+ * test targeting the unserved path passes {@link makeLivenessJudge}.
  * `getTimeoutMs` defaults to the production value — override it with a small
  * number to exercise the timeout without waiting it out.
  */
@@ -143,11 +152,49 @@ export function makeParentAuthorizerDeps(
   };
 }
 
-/** A `ServingLookup` that answers "yes" for any session (the non-fast-fail default). */
-const alwaysServing: ServingLookup = {
+/** A `TargetServingLookup` answering "yes" for any target (the non-fast-fail default). */
+const alwaysServing: TargetServingLookup = {
   isServing: () => true,
-  servingIds: () => [],
+  describe: () => ({ channel: "none", state: null, servingIds: [] }),
 };
+
+/**
+ * Builds the real judge over an in-process registry and the heartbeat records
+ * under `forwardingDir`.
+ *
+ * The production collaborator rather than a fake, because what these tests are
+ * about is which channel answers for which target — a hand-written double would
+ * be free to disagree with the routing under test.
+ */
+export function makeLivenessJudge(options: {
+  forwardingDir: string;
+  registry?: ServingLookup;
+  isProcessAlive?: (pid: number) => boolean;
+}): ForwardingLivenessJudge {
+  return new ForwardingLivenessJudge({
+    registry: options.registry ?? new ServingSessionRegistry(),
+    heartbeats: new ServingHeartbeatStore({
+      forwardingDir: options.forwardingDir,
+      logger: { review: vi.fn(), debug: vi.fn() },
+      ...(options.isProcessAlive
+        ? { isProcessAlive: options.isProcessAlive }
+        : {}),
+    }),
+  });
+}
+
+/** Publishes a serving heartbeat for `sessionId`, as a live parent would. */
+export function publishServingHeartbeat(
+  forwardingDir: string,
+  sessionId: string,
+  pid?: number,
+): void {
+  new ServingHeartbeatStore({
+    forwardingDir,
+    logger: { review: vi.fn(), debug: vi.fn() },
+    ...(pid === undefined ? {} : { pid }),
+  }).markServing(sessionId);
+}
 
 /**
  * Builds a well-formed `ForwardedAccessIntent` (ADR 0008 §2) for request /

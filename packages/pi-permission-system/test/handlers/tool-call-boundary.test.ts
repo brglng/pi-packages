@@ -110,12 +110,56 @@ describe("createFailClosedToolCall", () => {
     expect(reporter.writeReviewLog).toHaveBeenCalledWith(
       "permission_request.blocked",
       expect.objectContaining({
+        requestId: expect.stringMatching(/^perm-/),
         toolName: "bash",
         command: "cd /repo && git push",
         resolution: "gate_error",
         error: "parser init failed",
+        decidedBy: { kind: "gate_error", reason: "parser init failed" },
       }),
     );
+  });
+
+  it("identifies each errored call separately", async () => {
+    const reporter = makeReporter();
+    const gate = vi
+      .fn<(event: unknown, ctx: ExtensionContext) => Promise<GateOutcome>>()
+      .mockRejectedValue(new Error("parser init failed"));
+    const boundary = createFailClosedToolCall(
+      gate,
+      reporter,
+      makeAudit(),
+      makeTracer(),
+    );
+
+    await boundary(makeToolCallEvent("bash"), makeCtx());
+    await boundary(makeToolCallEvent("bash"), makeCtx());
+
+    const ids = vi
+      .mocked(reporter.writeReviewLog)
+      .mock.calls.map(([, details]) => details.requestId);
+    expect(ids[0]).not.toBe(ids[1]);
+  });
+
+  it("still blocks when recording the gate error itself throws", async () => {
+    const reporter = makeReporter({
+      writeReviewLog: () => {
+        throw new Error("review log unwritable");
+      },
+    });
+    const gate = vi
+      .fn<(event: unknown, ctx: ExtensionContext) => Promise<GateOutcome>>()
+      .mockRejectedValue(new Error("parser init failed"));
+    const boundary = createFailClosedToolCall(
+      gate,
+      reporter,
+      makeAudit(),
+      makeTracer(),
+    );
+
+    const result = await boundary(makeToolCallEvent("bash"), makeCtx());
+
+    expect((result as { block?: true }).block).toBe(true);
   });
 
   it("does not throw when the event is malformed and the gate throws", async () => {

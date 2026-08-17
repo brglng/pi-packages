@@ -1,0 +1,9 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": ".",
+    "allowImportingTsExtensions": true
+  },
+  "include": ["src/**/*.ts", "test/**/*.ts"],
+  "exclude": ["test/authorizer-integration.test.ts"]
+}

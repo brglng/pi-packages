@@ -32,6 +32,24 @@ importers:
 
   .: {}
 
+  packages/pi-auto-review:
+    devDependencies:
+      '@brglng/pi-permission-system':
+        specifier: workspace:26.2.0-brglng.1
+        version: link:../pi-permission-system
+      '@earendil-works/pi-ai':
+        specifier: 0.83.0
+        version: 0.83.0(ws@8.21.3)(zod@4.4.3)
+      '@earendil-works/pi-coding-agent':
+        specifier: 0.83.0
+        version: 0.83.0(ws@8.21.3)(zod@4.4.3)
+      '@types/node':
+        specifier: ^22.15.3
+        version: 22.20.1
+      typescript:
+        specifier: ^6.0.3
+        version: 6.0.3
+
   packages/pi-bailian:
     devDependencies:
       '@biomejs/biome':
@@ -61,24 +79,6 @@ importers:
       vitest:
         specifier: 'catalog:'
         version: 4.1.10(@opentelemetry/api@1.9.0)(@types/node@22.20.1)(vite@8.2.1(@types/node@22.20.1)(jiti@2.7.0)(yaml@2.9.0))
-
-  packages/pi-permission-auto-review:
-    devDependencies:
-      '@brglng/pi-permission-system':
-        specifier: 25.1.1
-        version: 25.1.1(@earendil-works/pi-coding-agent@0.83.0(ws@8.21.3)(zod@4.4.3))(@earendil-works/pi-tui@0.83.0)
-      '@earendil-works/pi-ai':
-        specifier: 0.83.0
-        version: 0.83.0(ws@8.21.3)(zod@4.4.3)
-      '@earendil-works/pi-coding-agent':
-        specifier: 0.83.0
-        version: 0.83.0(ws@8.21.3)(zod@4.4.3)
-      '@types/node':
-        specifier: ^22.15.3
-        version: 22.20.1
-      typescript:
-        specifier: ^6.0.3
-        version: 6.0.3
 
   packages/pi-permission-system:
     dependencies:
@@ -326,13 +326,6 @@ packages:
     engines: {node: '>=14.21.3'}
     cpu: [x64]
     os: [win32]
-
-  '@brglng/pi-permission-system@25.1.1':
-    resolution: {integrity: sha512-lbkionyPYegJGm2j/XNXI8C2NT3WBp437MwSLaiwv5NvGPApem8eBSBo+jeCAqdSDf/SI3lLnlT+WTh2Z3NErQ==}
-    engines: {node: '>=22'}
-    peerDependencies:
-      '@earendil-works/pi-coding-agent': '>=0.79.0'
-      '@earendil-works/pi-tui': '>=0.79.0'
 
   '@earendil-works/pi-agent-core@0.79.10':
     resolution: {integrity: sha512-XKxgdjhcPuyjrthCOFSgfzT3xZ1uBrJ1IMVDxci1to6hIN6BIg9J5iY8q0pGXK1DLgATLP23da+1UyZLwA360Q==}
@@ -1743,16 +1736,6 @@ snapshots:
 
   '@biomejs/cli-win32-x64@2.5.8':
     optional: true
-
-  '@brglng/pi-permission-system@25.1.1(@earendil-works/pi-coding-agent@0.83.0(ws@8.21.3)(zod@4.4.3))(@earendil-works/pi-tui@0.83.0)':
-    dependencies:
-      '@earendil-works/pi-coding-agent': 0.83.0(ws@8.21.3)(zod@4.4.3)
-      '@earendil-works/pi-tui': 0.83.0
-      tree-sitter-bash: 0.25.1
-      web-tree-sitter: 0.26.12
-      zod: 4.4.3
-    transitivePeerDependencies:
-      - tree-sitter
 
   '@earendil-works/pi-agent-core@0.79.10(ws@8.21.3)(zod@4.4.3)':
     dependencies:

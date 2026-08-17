@@ -8,12 +8,7 @@
 
 Permission enforcement extension for the [Pi](https://pi.mariozechner.at/) coding agent that provides centralized, deterministic permission gates over tool, bash, MCP, skill, and special operations.
 
-> **Fork notice (brglng):** This package is additionally forked from [`@gotgenes/pi-permission-system`](https://github.com/gotgenes/pi-packages) (`packages/pi-permission-system`) and published to npm as `@brglng/pi-permission-system`.
-> Changes made in this fork:
-> - Add a `fullCommand` field to `PermissionCheckResult`, `PromptPermissionDetails`, and the review log, so an authorizer link (e.g. `@brglng/pi-permission-auto-review`) receives the full chained bash command instead of only the matched sub-command.
->
-> **Fork notice:** This package is a full fork of [MasuRii/pi-permission-system](https://github.com/MasuRii/pi-permission-system), published to npm as `@gotgenes/pi-permission-system`.
-> It has diverged substantially from upstream in config format, internal architecture, and permission model.
+> **Fork notice (brglng):** This package is forked from [`@gotgenes/pi-permission-system`](https://github.com/gotgenes/pi-packages) (`packages/pi-permission-system`) and published to npm as `@brglng/pi-permission-system`.
 
 ## What It Does
 
@@ -70,7 +65,7 @@ All permissions use one of three states:
 
 When the dialog prompts, you can approve once or approve a pattern for the rest of the session.
 In an interactive TUI session the prompt is an inline keybind dialog — `y` approve, `s` approve for this session, `n` deny, `r` deny with a reason — where each hotkey arms and a second press confirms (configurable via `doublePressToConfirm`).
-Pi's tool-expansion binding (`app.tools.expand`, `Ctrl+O` by default) keeps working while the dialog is open, so you can expand a truncated tool preview before deciding.
+The prompt shows one fact per line — who is asking, the tool, the matched rule, the value being decided — within a row budget, so a large tool input cannot take over the transcript; `Ctrl+O` (`app.tools.expand`) expands it to the complete request.
 See [docs/configuration.md](docs/configuration.md#inline-permission-dialog-tui) for the hotkeys and [docs/session-approvals.md](docs/session-approvals.md) for session-scoped rules and pattern suggestions.
 
 The `path` surface is a cross-cutting gate that applies to **all** file access — Pi tools, bash commands, MCP calls, and extension tools alike.
@@ -143,18 +138,20 @@ If you relied on the old permissive behavior for bash, set an explicit permissiv
 
 ## Documentation
 
-| Document                                                                                                                       | Contents                                                                                      |
-| ------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------- |
-| [docs/configuration.md](docs/configuration.md)                                                                                 | Full policy reference, runtime knobs, per-agent overrides, recipes                            |
-| [docs/session-approvals.md](docs/session-approvals.md)                                                                         | Session-scoped rules, pattern suggestions, bash arity table                                   |
-| [docs/cross-extension-api.md](docs/cross-extension-api.md)                                                                     | Cross-extension service accessor, event bus integration, prompt and decision broadcasts       |
-| [docs/subagent-integration.md](docs/subagent-integration.md)                                                                   | Permission forwarding, coexistence with subagent extensions                                   |
-| [docs/guides/permission-frontmatter-for-subagent-extensions.md](docs/guides/permission-frontmatter-for-subagent-extensions.md) | Convention guide for subagent extension authors                                               |
-| [docs/opencode-compatibility.md](docs/opencode-compatibility.md)                                                               | OpenCode compatibility — shared concepts, divergences, porting guide                          |
-| [docs/troubleshooting.md](docs/troubleshooting.md)                                                                             | Common issues, diagnostic logging, threat model                                               |
-| [docs/migration/legacy-to-flat.md](docs/migration/legacy-to-flat.md)                                                           | Migration from pre-v2 config layout                                                           |
-| [docs/migration/strict-config-validation.md](docs/migration/strict-config-validation.md)                                       | Strict config validation (breaking) — rejected configs, and the cross-scope fail-closed clamp |
-| [docs/migration/0644-project-trust-gating.md](docs/migration/0644-project-trust-gating.md)                                     | Project-trust gating (breaking) — project config loads only after project trust               |
+| Document                                                                                                                       | Contents                                                                                                             |
+| ------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------- |
+| [docs/configuration.md](docs/configuration.md)                                                                                 | Full policy reference, runtime knobs, per-agent overrides, recipes                                                   |
+| [docs/session-approvals.md](docs/session-approvals.md)                                                                         | Session-scoped rules, pattern suggestions, bash arity table                                                          |
+| [docs/cross-extension-api.md](docs/cross-extension-api.md)                                                                     | Cross-extension service accessor, event bus integration, prompt and decision broadcasts                              |
+| [docs/subagent-integration.md](docs/subagent-integration.md)                                                                   | Permission forwarding, coexistence with subagent extensions                                                          |
+| [docs/guides/permission-frontmatter-for-subagent-extensions.md](docs/guides/permission-frontmatter-for-subagent-extensions.md) | Convention guide for subagent extension authors                                                                      |
+| [docs/opencode-compatibility.md](docs/opencode-compatibility.md)                                                               | OpenCode compatibility — shared concepts, divergences, porting guide                                                 |
+| [docs/troubleshooting.md](docs/troubleshooting.md)                                                                             | Common issues, diagnostic logging, threat model                                                                      |
+| [docs/migration/legacy-to-flat.md](docs/migration/legacy-to-flat.md)                                                           | Migration from pre-v2 config layout                                                                                  |
+| [docs/migration/strict-config-validation.md](docs/migration/strict-config-validation.md)                                       | Strict config validation (breaking) — rejected configs, and the cross-scope fail-closed clamp                        |
+| [docs/migration/0644-project-trust-gating.md](docs/migration/0644-project-trust-gating.md)                                     | Project-trust gating (breaking) — project config loads only after project trust                                      |
+| [docs/migration/0745-prompt-payload-contracts.md](docs/migration/0745-prompt-payload-contracts.md)                             | Prompt payload contracts (breaking) — the forwarded wire, the `ui_prompt` broadcast, and the deprecated preview caps |
+| [docs/migration/0746-review-log-fields.md](docs/migration/0746-review-log-fields.md)                                           | Review-log fields (breaking) — `message` replaced by request facts, and the `reviewLogFieldMaxWidth` bound           |
 
 ## Development
 

@@ -52,6 +52,75 @@ Test count went 2757 → 2769 (+12) in pi-permission-system; `check`, root `lint
 - Pre-completion reviewer: WARN (1 non-blocking finding) — the extracted fixtures typed `prompt` as `ReturnType<typeof vi.fn>` rather than `Mock<Sig>`, a pre-existing pattern carried in verbatim.
   Fixed in `7d285aed` rather than deferred, since the file is new in this change and two test files now import it.
 
+## Stage: Final Retrospective (2026-08-14T16:24:54Z)
+
+### Session summary
+
+Three stages — planning, TDD, ship — took a bug report whose headline claim was wrong and turned it into a settled design rule plus two observability records, shipped as `@gotgenes/pi-permission-system@25.2.0`.
+Nine commits, +12 tests, one follow-up issue filed ([#732]), zero rework at the commit level.
+The decisive move happened in the first ten minutes: measuring the operator's own 9167-record review log rather than reasoning from the code alone.
+
+### Observations
+
+#### What went well
+
+- **Log-mining falsified the report, not just quantified it.**
+  The package skill frames review-log mining as a way to size a proposed gate change's blast radius ([#694]).
+  Here the same technique answered a *causal* question: a per-day breakdown split 43 `authorizer_chain_unregistered_link` records into 15 adjacent to a `forwarded_permission.request_created` (the child-relay false alarm) and 23 on one day with zero forwarding (a genuine unregistered link).
+  That split is the entire reason the fix suppresses the event conditionally instead of deleting or downgrading it.
+  A code-only reading would have produced a worse fix that still looked correct.
+- **The `tidy-first-assessor` out-planned the plan.**
+  It found the plan's extraction list under-specified (`makePrompterApi` is a hard dependency of the shared deps factory and is called directly at four sites; `makeDetection` was byte-identical in both files), and proposed a second commit the plan did not have — migrating `authorizer.test.ts` onto the shared fixtures *before* the return-type change.
+  That kept the compile-breaking step a pure `.terminal` edit.
+  This is the first session where the assessor's output materially improved the decomposition rather than confirming it.
+- **The non-vacuity probe on a green-on-arrival test.**
+  Step 2's characterization test passed the moment it was written, which is exactly when a test proves nothing.
+  Flipping `getAuthorizerChain` to `[]` made it fail, then the probe was reverted — the `testing` skill's "build the probe to match the guard's exact predicate" rule applied to a characterization test, where it is arguably more necessary than on a guard.
+- **The `ask_user` gate took four questions with no bounce.**
+  The pre-ask message carried measured counts and a concrete before/after per option — the practice earlier retros asked for ([#635], [#678]) — and all four answers came back clean on the first attempt.
+
+#### What caused friction (agent side)
+
+- `instruction-violation` (reviewer-caught) — the extracted `test/helpers/authorizer-fixtures.ts` typed `prompt` as `ReturnType<typeof vi.fn>`.
+  The `testing` skill was loaded at the start of the TDD stage and names this exact anti-pattern ("in Vitest v4 it expands to `Mock<Procedure | Constructable>`, a union that TypeScript cannot call").
+  Loading the rule did not help, because the extraction was a *copy*: the violating text came from the source file, and nothing in the move re-read it as newly-authored code.
+  Caught by the `pre-completion-reviewer`, not by me and not by the user.
+  Impact: one extra `refactor:` commit (`7d285aed`) after the docs commit.
+- `scope-drift` (self-identified) — drafted the step-5 `authorizer_chain_resolved` tests in the same `Edit` as the step-4 delegation tests, then had to remove them to keep the `fix:` and `feat:` commits separate.
+  Impact: one wasted `Edit` cycle, caught before running tests; no commit churn.
+- `other` — three separate compound commands surfaced as tool errors because a `grep` existence probe found nothing (the desired answer): the retro-file check, the ADR amendment-convention check, and the AGENTS.md-documented `grep -c 'lint/' /tmp/l.log` lint-warning count.
+  Impact: a re-read each time to confirm the "error" was the healthy case; no rework.
+
+#### What caused friction (user side)
+
+- Nothing material.
+  The only intervention was an accidental interrupt, immediately acknowledged.
+- Opportunity, not friction: three open issues ([#699], [#726], and this one) plus one third-party PR ([#702]) all circle the same authorizer-observability surface.
+  Shipping them one at a time means each re-establishes the same context.
+  A single plan spanning the cluster — or an explicit decision to keep them independent — would be cheaper than the third independent ship.
+
+### Diagnostic details
+
+- **Model-performance correlation** — planning and TDD ran on `anthropic/claude-opus-5` (judgment-heavy: diagnosis, design, ADR amendment); ship ran on `anthropic/claude-sonnet-5` (mechanical, tool-driven — appropriate).
+  Both subagents (`tidy-first-assessor`, `pre-completion-reviewer`) ran on `anthropic/claude-sonnet-5` per their frontmatter; both did judgment work and both produced findings the parent had missed.
+  No mismatch found.
+- **Escalation-delay tracking** — no `rabbit-hole` friction points; longest run on a single error was one tool call.
+  Lens finds nothing.
+- **Unused-tool detection** — `colgrep` went unused, correctly: every exploration target was a known exact symbol (`authorizerChain`, `registerAuthorizer`, `selectAuthorizer`).
+  No `Explore` dispatch either — the report supplied named files and a numbered trace, which the `/plan-issue` prompt explicitly carves out as inline work ([#709]).
+- **Feedback-loop gap analysis** — no gap.
+  `vitest run <file>` ran after every red and every green; `pnpm run check` ran at each type-touching step; the full suite plus root `lint` ran before each commit; `fallow dead-code` ran at the baseline and again before push.
+
+### Changes made
+
+1. `.pi/skills/tidy-first/SKILL.md` — Step 3 gains a rule that an extraction carries the source's rule violations into a now-shared file, so moved code must be re-read against the governing skill before committing.
+2. `.pi/skills/package-pi-permission-system/SKILL.md` — Debugging §6 widened: the review log answers diagnostic questions (counting an `event` per day and against an adjacent event's timestamps), not only blast-radius sizing over bash commands.
+
+[#635]: https://github.com/gotgenes/pi-packages/issues/635
+[#678]: https://github.com/gotgenes/pi-packages/issues/678
+[#694]: https://github.com/gotgenes/pi-packages/issues/694
 [#699]: https://github.com/gotgenes/pi-packages/issues/699
 [#702]: https://github.com/gotgenes/pi-packages/pull/702
+[#709]: https://github.com/gotgenes/pi-packages/issues/709
+[#726]: https://github.com/gotgenes/pi-packages/issues/726
 [#732]: https://github.com/gotgenes/pi-packages/issues/732

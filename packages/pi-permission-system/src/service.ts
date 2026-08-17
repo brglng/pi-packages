@@ -49,6 +49,17 @@ export {
   PERMISSIONS_READY_CHANNEL,
   PERMISSIONS_UI_PROMPT_CHANNEL,
 } from "./permission-events";
+// The declaration bundle already inlines these through `PromptPermissionDetails`
+// and `PermissionUiPromptEvent`; the named exports are what a consumer needs to
+// annotate a variable of their own.
+export type {
+  PromptAnnotation,
+  PromptEvidence,
+  PromptPayload,
+  PromptPayloadKind,
+  PromptRequester,
+  PromptRequestFacts,
+} from "./presentation/prompt-payload";
 export type { PermissionCheckResult, PermissionState, ToolInputFormatter };
 
 /** Process-global key for the service slot. */

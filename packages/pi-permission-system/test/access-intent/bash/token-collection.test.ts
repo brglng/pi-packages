@@ -241,6 +241,44 @@ describe("collectRedirectTokens", () => {
       tree.delete();
     }
   });
+
+  describe("operands of a hosted nested command (#741)", () => {
+    it("collects the operand of a substitution used as the destination", async () => {
+      const { node, tree } = await parseRedirectNode(
+        "echo hi > $(cat /etc/shadow)",
+      );
+      try {
+        expect(collectRedirectTokens(node)).toEqual(["/etc/shadow"]);
+      } finally {
+        tree.delete();
+      }
+    });
+
+    it("collects the operand of a process substitution read as input", async () => {
+      const { node, tree } = await parseRedirectNode(
+        "cat < <(cat /etc/shadow)",
+      );
+      try {
+        expect(collectRedirectTokens(node)).toEqual(["/etc/shadow"]);
+      } finally {
+        tree.delete();
+      }
+    });
+
+    it("collects both the destination text and a concatenated operand", async () => {
+      const { node, tree } = await parseRedirectNode(
+        "echo hi > /tmp/$(cat /etc/shadow)",
+      );
+      try {
+        expect(collectRedirectTokens(node)).toEqual([
+          "/tmp/$(cat /etc/shadow)",
+          "/etc/shadow",
+        ]);
+      } finally {
+        tree.delete();
+      }
+    });
+  });
 });
 
 // ── collectPathCandidateTokens ────────────────────────────────────────────────
@@ -282,6 +320,46 @@ describe("collectPathCandidateTokens", () => {
     } finally {
       tree?.delete();
     }
+  });
+
+  describe("operands hosted in a heredoc body (#741)", () => {
+    async function collectFrom(command: string): Promise<string[]> {
+      const parser = await getParser();
+      const tree = parser.parse(command);
+      if (!tree) throw new Error("parse returned null");
+      try {
+        return collectPathCandidateTokens(tree.rootNode);
+      } finally {
+        tree.delete();
+      }
+    }
+
+    it("collects the operand of an interpolating heredoc body", async () => {
+      expect(await collectFrom("cat <<EOF\n$(cat /etc/shadow)\nEOF")).toEqual([
+        "/etc/shadow",
+      ]);
+    });
+
+    it.each([
+      ["single-quoted", "cat <<'EOF'\n$(cat /etc/shadow)\nEOF"],
+      ["double-quoted", 'cat <<"EOF"\n$(cat /etc/shadow)\nEOF'],
+    ])("collects nothing from a %s heredoc body", async (_label, command) => {
+      expect(await collectFrom(command)).toEqual([]);
+    });
+
+    it("never collects heredoc prose, even alongside a substitution", async () => {
+      expect(
+        await collectFrom(
+          "cat <<EOF\n/etc/passwd is prose\n$(cat /etc/shadow)\nEOF",
+        ),
+      ).toEqual(["/etc/shadow"]);
+    });
+
+    it("collects the operand of a herestring substitution", async () => {
+      expect(await collectFrom("cat <<< $(cat /etc/shadow)")).toEqual([
+        "/etc/shadow",
+      ]);
+    });
   });
 
   it("recurses into command substitution to collect nested tokens", async () => {

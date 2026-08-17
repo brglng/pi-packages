@@ -8,6 +8,8 @@
  * removed or renamed without a semver-major version bump.
  */
 
+import type { PromptRequestFacts } from "#src/presentation/prompt-payload";
+
 /** Minimal event bus interface required by the emit helpers. */
 export interface PermissionEventBus {
   emit(channel: string, data: unknown): void;
@@ -79,8 +81,19 @@ export interface PermissionUiPromptEvent {
   value: string | null;
   /** Agent name (when known). */
   agentName: string | null;
-  /** Message displayed to the user. */
-  message: string;
+  /**
+   * The ask's invariant core (ADR 0011 §3), verbatim from the prompt payload.
+   *
+   * Nested rather than flattened so the event and the payload share one shape:
+   * a fact added to `PromptRequestFacts` reaches the bus without a second
+   * hand-maintained declaration. Carries no evidence and no annotations — the
+   * bus is the narrowest renderer (ADR 0011 §6), observable by any loaded
+   * extension without the operator having named it.
+   *
+   * `request.surface` is the *gate* surface the rule fired on; the top-level
+   * `surface` is the display projection. Both are here on purpose.
+   */
+  request: PromptRequestFacts;
   /** Forwarding context, or null for a direct prompt. */
   forwarding: ForwardedPromptContext | null;
 }
@@ -101,6 +114,12 @@ export type PermissionDecisionResolution =
 
 /** Payload emitted on `permissions:decision`. */
 export interface PermissionDecisionEvent {
+  /**
+   * Identifies the permission request this decision resolves, minted when the
+   * request was created. Distinct from the host's tool-call id: one tool call
+   * runs several gates and so raises several requests.
+   */
+  requestId: string;
   /** Permission surface: "bash", "read", "mcp", "skill", "external_directory", etc. */
   surface: string;
   /** The value that was evaluated (command, tool name, skill name, path). */

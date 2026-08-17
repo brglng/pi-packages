@@ -11,8 +11,8 @@
 
 import { describe, expect, it, vi } from "vitest";
 
-import { EXTENSION_TAG } from "#src/denial-messages";
-import { formatExternalDirectoryAskPrompt } from "#src/handlers/gates/external-directory-messages";
+import { EXTENSION_TAG } from "#src/presentation/agent-renderer";
+import { buildExternalDirectoryAskPayload } from "#src/presentation/path-ask-payload";
 import type { PermissionCheckResult } from "#src/types";
 import {
   ALL_PATH_BEARING_TOOLS,
@@ -44,16 +44,15 @@ vi.mock("@earendil-works/pi-coding-agent", async (importOriginal) => {
 // ── Regression guard: helper presence ──────────────────────────────────────
 
 describe("external_directory helper regression guard", () => {
-  it("formatExternalDirectoryAskPrompt is a callable function", () => {
-    expect(typeof formatExternalDirectoryAskPrompt).toBe("function");
+  it("the external-directory ask names the path it gates", () => {
     expect(
-      formatExternalDirectoryAskPrompt(
-        "read",
-        "/outside/file",
-        undefined,
-        "/project",
-      ),
-    ).toContain("/outside/file");
+      buildExternalDirectoryAskPayload({
+        toolName: "read",
+        pathValue: "/outside/file",
+        cwd: "/project",
+        agentName: null,
+      }).request.value,
+    ).toBe("/outside/file");
   });
 
   it("EXTENSION_TAG is the expected value", () => {
@@ -61,8 +60,8 @@ describe("external_directory helper regression guard", () => {
   });
 
   // formatExternalDirectoryDenyReason, formatExternalDirectoryUserDeniedReason,
-  // and formatExternalDirectoryHardStopHint have moved to denial-messages.ts.
-  // Their behavior is tested in denial-messages.test.ts.
+  // and formatExternalDirectoryHardStopHint are now renders over the prompt
+  // payload. Their behavior is tested in presentation/agent-renderer.test.ts.
 });
 
 // ── Path scope: gate applicability ────────────────────────────────────────
@@ -372,8 +371,10 @@ describe("external_directory policy state — ask", () => {
       makeCtx({ hasUI: false }),
     );
     expect(result).toMatchObject({ action: "block" });
-    expect((result as { reason?: string }).reason).toContain(
-      "outside the working directory",
+    // The gate surface names the boundary; an unavailable verdict states only
+    // that approval was unreachable, since no retry shape changes that.
+    expect((result as { reason?: string }).reason).toBe(
+      `${EXTENSION_TAG} This 'external_directory' call for tool 'read' for path '${EXTERNAL_PATH}' requires approval, but no interactive UI is available.`,
     );
   });
 

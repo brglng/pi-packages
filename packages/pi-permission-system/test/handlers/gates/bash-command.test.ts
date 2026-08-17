@@ -137,8 +137,25 @@ describe("resolveBashCommandCheck", () => {
     expect(result.matchedPattern).toBe("<unparseable-bash-command>");
     expect(result.command).toBe("( rm x )");
     expect(result.commandContext).toBeUndefined();
-    // The synthetic ask is returned without consulting the resolver.
-    expect(resolver.resolve).not.toHaveBeenCalled();
+    // The whole command is resolved once, to see whether a deny rule covers it.
+    expect(resolver.resolve).toHaveBeenCalledTimes(1);
+    expect(resolver.resolve).toHaveBeenCalledWith({
+      kind: "tool",
+      surface: "bash",
+      input: { command: "( rm x )" },
+      agentName: undefined,
+    });
+  });
+
+  it("returns the explicit deny when an unparseable command matches a deny rule", () => {
+    const resolver = makeResolver(bashResult("deny", "( rm x )", "rm *"));
+
+    const result = resolveBashCommandCheck("( rm x )", [], undefined, resolver);
+
+    // The fail-closed ask must not mask a hard deny into an approvable prompt.
+    expect(result.state).toBe("deny");
+    expect(result.matchedPattern).toBe("rm *");
+    expect(result.command).toBe("( rm x )");
   });
 
   it("forwards the agent name to each sub-command check", () => {
@@ -271,6 +288,41 @@ describe("resolveBashCommandCheck", () => {
       expect(result.state).toBe("ask");
       expect(result.matchedPattern).toBe("<indirection-bash-wrapper>");
       expect(result.command).toBe("sudo aws s3 rm s3://bucket");
+    });
+
+    it("carries the winning unit's executed command onto the result", () => {
+      const resolver = makeResolver(bashResult("allow", "sudo aws s3 rm", "*"));
+
+      const result = resolveBashCommandCheck(
+        "sudo aws s3 rm",
+        [
+          {
+            text: "sudo aws s3 rm",
+            wrapperKind: "indirection",
+            executedUnit: "aws s3 rm",
+          },
+        ],
+        undefined,
+        resolver,
+      );
+
+      expect(result.executedUnit).toBe("aws s3 rm");
+      // The gate still decides on the unit text, not the inner command.
+      expect(result.command).toBe("sudo aws s3 rm");
+      expect(result.matchedPattern).toBe("<indirection-bash-wrapper>");
+    });
+
+    it("leaves the executed command absent for an ordinary unit", () => {
+      const resolver = makeResolver(bashResult("ask", "rm x", "rm *"));
+
+      const result = resolveBashCommandCheck(
+        "rm x",
+        [{ text: "rm x" }],
+        undefined,
+        resolver,
+      );
+
+      expect(result.executedUnit).toBeUndefined();
     });
 
     it("keeps an explicit deny on an indirection wrapper", () => {

@@ -194,17 +194,40 @@ export const unifiedConfigSchema = z
         "How long a subagent waits for the parent session to answer a forwarded permission request, in milliseconds.\n\nOmit to use the default (`600000`, ten minutes). A child whose in-process parent is not draining its inbox at all gives up in a couple of seconds regardless of this value, so lower it only to bound how long you are willing to leave an *unanswered* prompt pending.",
       default: 600000,
     }),
-    toolInputPreviewMaxLength: z.number().int().min(1).optional().meta({
+    promptMaxRows: z.number().int().min(1).optional().meta({
       description:
-        "Maximum character length of the inline-JSON tool-input preview shown in permission prompts. Omit to use the default (200). Set to a large value to disable truncation.",
+        "Maximum rows a permission prompt renders before eliding its evidence. Omit to use the default (24).",
       markdownDescription:
-        "Maximum character length of the inline-JSON tool-input preview shown in permission prompts.\n\nOmit to use the default (200). Set to a large value (e.g. `10000`) to effectively disable truncation and see the full input.",
+        "Maximum rows a permission prompt renders before eliding its evidence.\n\nOmit to use the default (24). The request's own facts — the requesting agent, the tool, the matched rule, the decision-relevant value — are never elided by this budget; what gives way is the supporting evidence, and `Ctrl+O` expands the prompt to the complete request.",
+      default: 24,
+    }),
+    promptFieldMaxWidth: z.number().int().min(1).optional().meta({
+      description:
+        "Maximum characters of any one field shown in a permission prompt. Omit to use the default (400).",
+      markdownDescription:
+        "Maximum characters of any one field shown in a permission prompt.\n\nOmit to use the default (400). This is what bounds a single pathological field — a long here-string command, say — that would otherwise fill the prompt through wrapping. A shortened field is marked with an ellipsis, and `Ctrl+O` shows it in full.",
+      default: 400,
+    }),
+    reviewLogFieldMaxWidth: z.number().int().min(1).optional().meta({
+      description:
+        "Maximum characters of any one value written to the permission review log. Omit to use the default (1000).",
+      markdownDescription:
+        "Maximum characters of any one value written to the permission review log.\n\nOmit to use the default (1000). Every string the review log writes is narrowed to this width and marked with an ellipsis, so the log's growth is a decision you make rather than a side effect of how long a command happened to be. Raise it to keep longer values \u2014 a bash command exceeding the width is stored shortened.\n\nThis is a length bound, not redaction: it never inspects a value to decide what to hide. Key-name masking is unchanged and applies independently.",
+      default: 1000,
+    }),
+    toolInputPreviewMaxLength: z.number().int().min(1).optional().meta({
+      deprecated: true,
+      description:
+        "Deprecated and ignored. Superseded by promptMaxRows and promptFieldMaxWidth, which bound the whole prompt rather than one preview. Still accepted so an existing config is not rejected; remove it.",
+      markdownDescription:
+        "**Deprecated and ignored.** Superseded by `promptMaxRows` and `promptFieldMaxWidth`, which bound the whole permission prompt rather than one preview inside it.\n\nStill accepted so an existing config is not rejected fail-closed, but the value no longer takes effect. Remove it.",
     }),
     toolTextSummaryMaxLength: z.number().int().min(1).optional().meta({
+      deprecated: true,
       description:
-        "Maximum character length of inline pattern/path summaries (e.g. grep patterns, find globs, ls paths) in permission prompts. Omit to use the default (80).",
+        "Deprecated and ignored. Superseded by promptMaxRows and promptFieldMaxWidth, which bound the whole prompt rather than one summary. Still accepted so an existing config is not rejected; remove it.",
       markdownDescription:
-        "Maximum character length of inline pattern/path summaries (e.g. grep patterns, find globs, ls paths) shown in permission prompts.\n\nOmit to use the default (80). Increase this when working with long regexes or deep paths that are being cut off.",
+        "**Deprecated and ignored.** Superseded by `promptMaxRows` and `promptFieldMaxWidth`, which bound the whole permission prompt rather than one summary inside it.\n\nStill accepted so an existing config is not rejected fail-closed, but the value no longer takes effect. Remove it.",
     }),
     piInfrastructureReadPaths: z.array(z.string().min(1)).optional().meta({
       description:

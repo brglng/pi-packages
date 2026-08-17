@@ -1,13 +1,13 @@
 import type { AccessPath } from "#src/access-intent/access-path";
 import type { BashProgram } from "#src/access-intent/bash/program";
 import type { ScopedPermissionResolver } from "#src/permission-resolver";
+import { buildPathAskPayload } from "#src/presentation/path-ask-payload";
 import { SessionApproval } from "#src/session-approval";
 import { deriveApprovalPattern } from "#src/session-rules";
 import type { PermissionCheckResult } from "#src/types";
 import { pickMostRestrictive } from "./candidate-check";
 import type { GateResult } from "./descriptor";
 import { accessFactsFromPath } from "./helpers";
-import { formatPathAskPrompt } from "./path";
 import type { ToolCallContext } from "./types";
 
 /**
@@ -84,6 +84,14 @@ export function describeBashPathGate(
   if (allSessionCovered) {
     return {
       action: "allow",
+      // Every token was covered, each possibly by a different session pattern
+      // -- the surface is one value and the pattern is not. The entry's
+      // `tokens` lists what was covered.
+      decidedBy: {
+        kind: "session_approval",
+        surface: "path",
+        pattern: null,
+      },
       log: {
         event: "permission_request.session_approved",
         details: {
@@ -113,26 +121,21 @@ export function describeBashPathGate(
   // path), so it matches the values a later call produces. For an unknown base
   // (`forLiteral`) `value()` is the raw token.
   const pattern = deriveApprovalPattern(worstEntry.path.value());
-  const askMessage = formatPathAskPrompt(
-    tcc.toolName,
-    worstToken,
-    tcc.agentName ?? undefined,
-  );
+  const payload = buildPathAskPayload({
+    toolName: tcc.toolName,
+    pathValue: worstToken,
+    agentName: tcc.agentName,
+    matchedPattern: worstCheck.matchedPattern,
+  });
 
   return {
     surface: "path",
     input: { path: worstToken },
-    denialContext: {
-      kind: "bash_path",
-      command,
-      pathValue: worstToken,
-      agentName: tcc.agentName ?? undefined,
-    },
+    payload,
     sessionApproval: SessionApproval.single("path", pattern),
     promptDetails: {
       source: "tool_call",
       agentName: tcc.agentName,
-      message: askMessage,
       toolCallId: tcc.toolCallId,
       toolName: tcc.toolName,
       command,

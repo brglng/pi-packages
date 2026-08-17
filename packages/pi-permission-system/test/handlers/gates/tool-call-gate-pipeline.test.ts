@@ -107,7 +107,6 @@ describe("ToolCallGatePipeline", () => {
       const getToolPreviewLimits = vi.fn(() => ({
         toolInputPreviewMaxLength: 500,
         toolTextSummaryMaxLength: 100,
-        toolInputLogPreviewMaxLength: 200,
       }));
       const resolver = makeResolver(makeCheckResult());
       const inputs = makeGateInputs({ getToolPreviewLimits });

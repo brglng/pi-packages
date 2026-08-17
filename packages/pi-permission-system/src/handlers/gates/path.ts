@@ -1,6 +1,7 @@
 import { getToolInputPath } from "#src/access-intent/tool-input-path";
 import type { PathNormalizer } from "#src/path-normalizer";
 import type { ScopedPermissionResolver } from "#src/permission-resolver";
+import { buildPathAskPayload } from "#src/presentation/path-ask-payload";
 import { SessionApproval } from "#src/session-approval";
 import { deriveApprovalPattern } from "#src/session-rules";
 import type { ToolAccessExtractorLookup } from "#src/tool-access-extractor-registry";
@@ -47,24 +48,21 @@ export function describePathGate(
   // the policy values a later call produces.
   const pattern = deriveApprovalPattern(accessPath.value());
 
+  const payload = buildPathAskPayload({
+    toolName: tcc.toolName,
+    pathValue: filePath,
+    agentName: tcc.agentName,
+    matchedPattern: check.matchedPattern,
+  });
+
   const descriptor: GateDescriptor = {
     surface: "path",
     input: { path: filePath },
-    denialContext: {
-      kind: "path",
-      toolName: tcc.toolName,
-      pathValue: filePath,
-      agentName: tcc.agentName ?? undefined,
-    },
+    payload,
     sessionApproval: SessionApproval.single("path", pattern),
     promptDetails: {
       source: "tool_call",
       agentName: tcc.agentName,
-      message: formatPathAskPrompt(
-        tcc.toolName,
-        filePath,
-        tcc.agentName ?? undefined,
-      ),
       toolCallId: tcc.toolCallId,
       toolName: tcc.toolName,
       path: filePath,
@@ -85,13 +83,4 @@ export function describePathGate(
   };
 
   return descriptor;
-}
-
-export function formatPathAskPrompt(
-  toolName: string,
-  pathValue: string,
-  agentName?: string,
-): string {
-  const subject = agentName ? `Agent '${agentName}'` : "Current agent";
-  return `${subject} requested tool '${toolName}' for path '${pathValue}'. Allow this path access?`;
 }

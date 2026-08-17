@@ -36,7 +36,9 @@ import type { PermissionCheckResult } from "#src/types";
  * to zero command units (a parse anomaly or an opaque program) fails closed to
  * a synthetic `ask` so a permissive top-level `*` cannot silently allow an
  * unparseable command (e.g. `cd /repo && git push` riding a top-level allow on
- * the empty-parse path) — #452.
+ * the empty-parse path) — #452. The whole command is still resolved first so an
+ * explicit `deny` covering it denies outright rather than being masked into an
+ * approvable prompt (#712).
  *
  * Pure and synchronous: the (async, tree-sitter) parse happens once in the
  * handler, which passes the decomposed `commands` here.
@@ -58,15 +60,11 @@ export function resolveBashCommandCheck(
 ): PermissionCheckResult {
   if (commands.length === 0) {
     if (isTriviallyEmptyCommand(command)) {
-      return {
-        ...resolver.resolve({
-          kind: "tool",
-          surface: "bash",
-          input: { command },
-          agentName,
-        }),
-        fullCommand: command,
-      };
+      return resolveWholeCommand(command, agentName, resolver);
+    }
+    const whole = resolveWholeCommand(command, agentName, resolver);
+    if (whole.state === "deny") {
+      return whole;
     }
     return {
       state: "ask",
@@ -74,7 +72,6 @@ export function resolveBashCommandCheck(
       source: "bash",
       origin: "builtin",
       command,
-      fullCommand: command,
       matchedPattern: "<unparseable-bash-command>",
     };
   }
@@ -86,7 +83,7 @@ export function resolveBashCommandCheck(
       input: { command: cmd.text },
       agentName,
     });
-    const result =
+    const floored =
       cmd.wrapperKind && base.state === "allow"
         ? {
             ...base,
@@ -94,18 +91,17 @@ export function resolveBashCommandCheck(
             matchedPattern: WRAPPER_SENTINEL[cmd.wrapperKind],
           }
         : base;
-    return cmd.context ? { ...result, commandContext: cmd.context } : result;
+    const result = cmd.context
+      ? { ...floored, commandContext: cmd.context }
+      : floored;
+    return cmd.executedUnit === undefined
+      ? result
+      : { ...result, executedUnit: cmd.executedUnit };
   });
-  return {
-    ...(pickMostRestrictive(results) ??
-      resolver.resolve({
-        kind: "tool",
-        surface: "bash",
-        input: { command },
-        agentName,
-      })),
-    fullCommand: command,
-  };
+  return (
+    pickMostRestrictive(results) ??
+    resolveWholeCommand(command, agentName, resolver)
+  );
 }
 
 /**
@@ -120,4 +116,18 @@ function isTriviallyEmptyCommand(command: string): boolean {
     .map((line) => line.trim())
     .filter((line) => line.length > 0);
   return lines.every((line) => line.startsWith("#"));
+}
+
+/** Resolve the whole command string as a single unit on the `bash` surface. */
+function resolveWholeCommand(
+  command: string,
+  agentName: string | undefined,
+  resolver: ScopedPermissionResolver,
+): PermissionCheckResult {
+  return resolver.resolve({
+    kind: "tool",
+    surface: "bash",
+    input: { command },
+    agentName,
+  });
 }

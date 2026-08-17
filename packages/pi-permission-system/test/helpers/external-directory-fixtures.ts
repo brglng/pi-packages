@@ -16,6 +16,7 @@ import type { ScopedPermissionManager } from "#src/permission-manager";
 import type { SessionLogger } from "#src/session-logger";
 import type { PermissionCheckResult, PermissionState } from "#src/types";
 import { wildcardMatch } from "#src/wildcard-matcher";
+import { DECIDED_BY_HUMAN } from "#test/helpers/decision-fixtures";
 
 import {
   getDecisionEvents,
@@ -77,9 +78,11 @@ export function makeExtDirCheck(
 /** AskEscalator stub that approves with `state: "approved"`. */
 export function makeApprovingPrompter(): AskEscalator {
   return {
-    escalate: vi
-      .fn<AskEscalator["escalate"]>()
-      .mockResolvedValue({ approved: true, state: "approved" }),
+    escalate: vi.fn<AskEscalator["escalate"]>().mockResolvedValue({
+      approved: true,
+      state: "approved",
+      decidedBy: DECIDED_BY_HUMAN,
+    }),
   };
 }
 
@@ -90,13 +93,16 @@ export function makeApprovingPrompter(): AskEscalator {
  */
 export function makeDenyingPrompter(denialReason?: string): AskEscalator {
   return {
-    escalate: vi
-      .fn<AskEscalator["escalate"]>()
-      .mockResolvedValue(
-        denialReason !== undefined
-          ? { approved: false, state: "denied", denialReason }
-          : { approved: false, state: "denied" },
-      ),
+    escalate: vi.fn<AskEscalator["escalate"]>().mockResolvedValue(
+      denialReason !== undefined
+        ? {
+            approved: false,
+            state: "denied",
+            denialReason,
+            decidedBy: DECIDED_BY_HUMAN,
+          }
+        : { approved: false, state: "denied", decidedBy: DECIDED_BY_HUMAN },
+    ),
   };
 }
 
@@ -110,6 +116,7 @@ export function makeUnavailablePrompter(): AskEscalator {
       approved: false,
       state: "denied",
       confirmationUnavailable: true,
+      decidedBy: DECIDED_BY_HUMAN,
     }),
   };
 }
@@ -186,9 +193,11 @@ export function makeExtDirDedupCheck(
 /** AskEscalator stub that approves for the session (`state: "approved_for_session"`). */
 function makeSessionApprovingPrompter(): AskEscalator {
   return {
-    escalate: vi
-      .fn<AskEscalator["escalate"]>()
-      .mockResolvedValue({ approved: true, state: "approved_for_session" }),
+    escalate: vi.fn<AskEscalator["escalate"]>().mockResolvedValue({
+      approved: true,
+      state: "approved_for_session",
+      decidedBy: DECIDED_BY_HUMAN,
+    }),
   };
 }
 
@@ -214,6 +223,7 @@ export function makeDedupWiring(prompter?: AskEscalator) {
     sessionRules,
     resolvedPrompter,
     reporter,
+    () => false,
   );
   const handler = new PermissionGateHandler(
     session,

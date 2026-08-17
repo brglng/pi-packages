@@ -11,7 +11,7 @@ merges for the rest of the current session, without asking again.
 The upstream remotes are:
 
 - `@brglng/pi-permission-system` → `https://github.com/gotgenes/pi-packages` (path `packages/pi-permission-system`)
-- `@brglng/pi-permission-auto-review` → `https://github.com/erichll/pi-packages` (path `packages/pi-auto-review`)
+- `@brglng/pi-auto-review` → `https://github.com/erichll/pi-packages` (path `packages/pi-auto-review`)
 
 Do not use `git merge`: this repo shares no common ancestor with the upstream
 repos. Compare the code directly and merge at the functional level. When a

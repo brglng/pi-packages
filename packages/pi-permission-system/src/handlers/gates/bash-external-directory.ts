@@ -1,9 +1,9 @@
 import type { BashProgram } from "#src/access-intent/bash/program";
 import type { ScopedPermissionResolver } from "#src/permission-resolver";
+import { buildBashExternalDirectoryAskPayload } from "#src/presentation/path-ask-payload";
 import { SessionApproval } from "#src/session-approval";
 import { deriveApprovalPattern } from "#src/session-rules";
 import type { GateResult } from "./descriptor";
-import { formatBashExternalDirectoryAskPrompt } from "./external-directory-messages";
 import { selectUncoveredExternalPaths } from "./external-directory-policy";
 import { accessFactsFromPath } from "./helpers";
 import type { ToolCallContext } from "./types";
@@ -47,6 +47,15 @@ export function describeBashExternalDirectoryGate(
   if (uncoveredPaths.length === 0) {
     return {
       action: "allow",
+      // A whole-command bypass covers every external path at once, and each
+      // may have matched a different session pattern -- so the surface is one
+      // value and the pattern is not. The entry's `externalPaths` lists what
+      // was covered.
+      decidedBy: {
+        kind: "session_approval",
+        surface: "external_directory",
+        pattern: null,
+      },
       log: {
         event: "permission_request.session_approved",
         details: {
@@ -76,30 +85,25 @@ export function describeBashExternalDirectoryGate(
     resolvedPath: path.resolvedAlias(),
   }));
 
-  const bashExtMessage = formatBashExternalDirectoryAskPrompt(
+  const payload = buildBashExternalDirectoryAskPayload({
     command,
-    disclosures,
-    tcc.cwd,
-    tcc.agentName ?? undefined,
-  );
+    externalPaths: disclosures,
+    cwd: tcc.cwd,
+    agentName: tcc.agentName,
+    toolName: tcc.toolName,
+    matchedPattern: preCheck.matchedPattern,
+  });
 
   const patterns = uncoveredPaths.map((p) => deriveApprovalPattern(p));
 
   return {
     surface: "external_directory",
     input: {},
-    denialContext: {
-      kind: "bash_external_directory",
-      command,
-      externalPaths: disclosures,
-      cwd: tcc.cwd,
-      agentName: tcc.agentName ?? undefined,
-    },
+    payload,
     sessionApproval: SessionApproval.multiple("external_directory", patterns),
     promptDetails: {
       source: "tool_call",
       agentName: tcc.agentName,
-      message: bashExtMessage,
       toolCallId: tcc.toolCallId,
       toolName: tcc.toolName,
       command,
@@ -112,7 +116,6 @@ export function describeBashExternalDirectoryGate(
       agentName: tcc.agentName,
       command,
       externalPaths: uncoveredPaths,
-      message: bashExtMessage,
     },
     decision: {
       surface: "external_directory",

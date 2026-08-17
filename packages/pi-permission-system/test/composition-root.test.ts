@@ -40,6 +40,7 @@ import { DEFAULT_EXTENSION_CONFIG } from "#src/extension-config";
 import piPermissionSystemExtension from "#src/index";
 import { PERMISSIONS_READY_CHANNEL } from "#src/permission-events";
 import { getPermissionsService } from "#src/service";
+import { publishServingHeartbeat } from "#test/helpers/forwarding-fixtures";
 import { makeFakePi } from "#test/helpers/make-fake-pi";
 
 const SERVICE_KEY = Symbol.for("@gotgenes/pi-permission-system:service");
@@ -355,6 +356,84 @@ describe("subagent registry sharing across factory instances", () => {
       `Session '${parentSessionId}' is not serving forwarded permission requests.`,
     );
     expect(result.reason).not.toContain("User denied");
+
+    rmSync(childCwd, { recursive: true, force: true });
+    rmSync(externalDir, { recursive: true, force: true });
+  });
+});
+
+describe("out-of-process forwarding liveness", () => {
+  // A child spawned as its own `pi` process resolves its parent from the
+  // environment and shares no `globalThis` with it, so the serving registry the
+  // tests above rely on is invisible to it. The filesystem heartbeat is the
+  // only signal it has (#721, #735 scenario 1).
+  const externalAsk = {
+    permission: { "*": "allow", external_directory: "ask" },
+  };
+
+  function fireChildRead(childCwd: string, externalDir: string) {
+    const childPi = makeFakePi({
+      events: createEventBus(),
+      toolNames: ["read"],
+    });
+    piPermissionSystemExtension(childPi as unknown as ExtensionAPI);
+    return childPi.fire(
+      "tool_call",
+      {
+        toolName: "read",
+        toolCallId: "child-external-read",
+        input: { path: join(externalDir, "secret.txt") },
+      },
+      makeChildCtx(childCwd, "child-session-oop"),
+    );
+  }
+
+  it("blocks promptly when the out-of-process parent published no heartbeat", async () => {
+    writeGlobalConfig(externalAsk);
+    const childCwd = mkdtempSync(join(tmpdir(), "pi-perm-child-cwd-"));
+    const externalDir = mkdtempSync(join(tmpdir(), "pi-perm-external-"));
+    const parentSessionId = "parent-session-oop-gone";
+    // The env-var path a process-based subagent extension uses: the hint makes
+    // the child detect itself, and the parent id names a session that exited.
+    vi.stubEnv("PI_SUBAGENT_CHILD", "1");
+    vi.stubEnv("PI_SUBAGENT_PARENT_SESSION", parentSessionId);
+
+    const result = (await fireChildRead(childCwd, externalDir)) as {
+      block?: true;
+      reason?: string;
+    };
+
+    expect(result.block).toBe(true);
+    expect(result.reason).toContain(
+      `Session '${parentSessionId}' is not serving forwarded permission requests.`,
+    );
+    expect(result.reason).not.toContain("User denied");
+
+    rmSync(childCwd, { recursive: true, force: true });
+    rmSync(externalDir, { recursive: true, force: true });
+  });
+
+  it("waits for an out-of-process parent whose heartbeat is fresh", async () => {
+    writeGlobalConfig(externalAsk);
+    const childCwd = mkdtempSync(join(tmpdir(), "pi-perm-child-cwd-"));
+    const externalDir = mkdtempSync(join(tmpdir(), "pi-perm-external-"));
+    const forwardingDir = join(agentDir, "sessions", "permission-forwarding");
+    const parentSessionId = "parent-session-oop-live";
+    vi.stubEnv("PI_SUBAGENT_CHILD", "1");
+    vi.stubEnv("PI_SUBAGENT_PARENT_SESSION", parentSessionId);
+    // What the parent's poll timer would have published; this test answers the
+    // request by hand instead of running that timer.
+    publishServingHeartbeat(forwardingDir, parentSessionId);
+
+    const firePromise = fireChildRead(childCwd, externalDir);
+    const request = await approveForwardedRequest(
+      forwardingDir,
+      parentSessionId,
+    );
+    expect(request.targetSessionId).toBe(parentSessionId);
+
+    const result = (await firePromise) as { block?: true };
+    expect(result.block).toBeUndefined();
 
     rmSync(childCwd, { recursive: true, force: true });
     rmSync(externalDir, { recursive: true, force: true });
@@ -1129,5 +1208,87 @@ describe("forwarded grant-scope selection round-trip", () => {
     await parentPi.fire("session_shutdown");
     rmSync(parentCwd, { recursive: true, force: true });
     rmSync(childCwd, { recursive: true, force: true });
+  });
+});
+
+describe("yolo grants asks synthesized after resolution", () => {
+  // The composition-stage ask→allow rewrite cannot reach a floor applied to a
+  // parsed command unit, so under yolo the wrapper and unparseable sentinels
+  // used to prompt anyway (#712). These drive the real factory end to end.
+  async function runBashCommand(
+    config: Record<string, unknown>,
+    command: string,
+  ): Promise<{ blocked: boolean; prompts: string[] }> {
+    writeGlobalConfig(config);
+    const cwd = mkdtempSync(join(tmpdir(), "pi-perm-yolo-cwd-"));
+    const pi = makeFakePi({ toolNames: ["bash"] });
+    piPermissionSystemExtension(pi as unknown as ExtensionAPI);
+
+    const prompts: string[] = [];
+    const { ctx } = makeUiCtx(cwd, prompts);
+    await fireSessionStart(pi, ctx);
+
+    const result = (await pi.fire(
+      "tool_call",
+      { toolName: "bash", toolCallId: "yolo-1", input: { command } },
+      ctx,
+    )) as { block?: true };
+
+    rmSync(cwd, { recursive: true, force: true });
+    return { blocked: result.block === true, prompts };
+  }
+
+  const permissiveBash = {
+    permission: { "*": "allow", bash: { "*": "allow" } },
+  };
+
+  it("auto-approves an indirection wrapper under yolo", async () => {
+    const outcome = await runBashCommand(
+      { ...permissiveBash, yoloMode: true },
+      "git status | xargs grep foo",
+    );
+
+    expect(outcome).toEqual({ blocked: false, prompts: [] });
+  });
+
+  it("still floors an indirection wrapper to a prompt with yolo off", async () => {
+    const outcome = await runBashCommand(
+      { ...permissiveBash, yoloMode: false },
+      "git status | xargs grep foo",
+    );
+
+    expect(outcome.blocked).toBe(false);
+    expect(outcome.prompts).toHaveLength(1);
+    expect(outcome.prompts[0]).toContain("<indirection-bash-wrapper>");
+  });
+
+  it("auto-approves an unparseable command under yolo", async () => {
+    const outcome = await runBashCommand(
+      { ...permissiveBash, yoloMode: true },
+      "> out.txt",
+    );
+
+    expect(outcome).toEqual({ blocked: false, prompts: [] });
+  });
+
+  it("blocks a denied wrapper under yolo", async () => {
+    const outcome = await runBashCommand(
+      {
+        permission: { "*": "allow", bash: { "*": "allow", "xargs*": "deny" } },
+        yoloMode: true,
+      },
+      "git status | xargs grep foo",
+    );
+
+    expect(outcome).toEqual({ blocked: true, prompts: [] });
+  });
+
+  it("blocks a denied unparseable command under yolo", async () => {
+    const outcome = await runBashCommand(
+      { permission: { "*": "allow", bash: { "*": "deny" } }, yoloMode: true },
+      "> out.txt",
+    );
+
+    expect(outcome).toEqual({ blocked: true, prompts: [] });
   });
 });

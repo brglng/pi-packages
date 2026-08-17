@@ -6,7 +6,6 @@ import type { ToolCallContext } from "#src/handlers/gates/types";
 import { posixPathFlavor } from "#src/path/path-flavor";
 import { PathNormalizer } from "#src/path-normalizer";
 import {
-  TOOL_INPUT_LOG_PREVIEW_MAX_LENGTH,
   TOOL_INPUT_PREVIEW_MAX_LENGTH,
   TOOL_TEXT_SUMMARY_MAX_LENGTH,
 } from "#src/tool-input-preview";
@@ -19,7 +18,6 @@ function makeFormatter(): ToolPreviewFormatter {
   return new ToolPreviewFormatter({
     toolInputPreviewMaxLength: TOOL_INPUT_PREVIEW_MAX_LENGTH,
     toolTextSummaryMaxLength: TOOL_TEXT_SUMMARY_MAX_LENGTH,
-    toolInputLogPreviewMaxLength: TOOL_INPUT_LOG_PREVIEW_MAX_LENGTH,
   });
 }
 
@@ -115,6 +113,11 @@ describe("describeToolGate", () => {
     // The invoked tool name is preserved for the review log and prompt.
     expect(desc.logContext.toolName).toBe("exec_command");
     expect(desc.promptDetails.toolName).toBe("exec_command");
+    // "Gated as bash, invoked as exec_command" is two facts, and the payload
+    // records both rather than collapsing them.
+    expect(desc.payload.kind).toBe("bash");
+    expect(desc.payload.request.toolName).toBe("bash");
+    expect(desc.payload.request.invokedToolName).toBe("exec_command");
   });
 
   it("returns mcp surface with target in decision.value for MCP tools", () => {
@@ -132,38 +135,37 @@ describe("describeToolGate", () => {
     expect(desc.decision.value).toBe("server:tool");
   });
 
-  it("populates denialContext with kind 'tool' and check result", () => {
-    const check = makeCheckResult("deny", { toolName: "read" });
-    const desc = describeToolGate(makeTcc(), check, makeFormatter());
-    expect(desc.denialContext).toEqual({
-      kind: "tool",
-      check,
-      agentName: undefined,
-      input: {},
+  it("carries the checked tool and its matched rule on the payload", () => {
+    const check = makeCheckResult("deny", {
+      toolName: "read",
+      matchedPattern: "re*",
     });
+    const desc = describeToolGate(makeTcc(), check, makeFormatter());
+    expect(desc.payload.kind).toBe("tool");
+    expect(desc.payload.request.toolName).toBe("read");
+    expect(desc.payload.request.matchedPattern).toBe("re*");
+    expect(desc.payload.request.requester.agentName).toBeNull();
   });
 
-  it("populates denialContext with agent name when provided", () => {
+  it("names the requesting agent on the payload when provided", () => {
     const check = makeCheckResult("ask", { toolName: "read" });
     const desc = describeToolGate(
       makeTcc({ agentName: "my-agent" }),
       check,
       makeFormatter(),
     );
-    expect(desc.denialContext.agentName).toBe("my-agent");
+    expect(desc.payload.request.requester.agentName).toBe("my-agent");
   });
 
-  it("populates denialContext with input for tool context", () => {
+  it("carries the command as the decision-relevant value for a bash ask", () => {
     const check = makeCheckResult("ask", { toolName: "bash", command: "ls" });
     const desc = describeToolGate(
       makeTcc({ toolName: "bash", input: { command: "ls" } }),
       check,
       makeFormatter(),
     );
-    expect(desc.denialContext).toMatchObject({
-      kind: "tool",
-      input: { command: "ls" },
-    });
+    expect(desc.payload.kind).toBe("bash");
+    expect(desc.payload.request.value).toBe("ls");
   });
 
   it("populates sessionApproval via suggestSessionPattern", () => {
@@ -243,7 +245,6 @@ describe("describeToolGate", () => {
       toolCallId: "tc-42",
       toolName: "read",
     });
-    expect(desc.promptDetails.message).toBeDefined();
     expect(desc.promptDetails.sessionLabel).toBeDefined();
   });
 

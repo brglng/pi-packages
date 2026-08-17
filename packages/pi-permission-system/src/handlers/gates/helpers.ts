@@ -1,11 +1,9 @@
 import type { AccessPath } from "#src/access-intent/access-path";
 import { classifyToolKind } from "#src/access-intent/tool-kind";
 import type { ForwardedAccessFacts } from "#src/authority/permission-forwarding";
-import type {
-  PermissionDecisionEvent,
-  PermissionDecisionResolution,
-} from "#src/permission-events";
+import type { PermissionDecisionResolution } from "#src/permission-events";
 import type { PermissionCheckResult } from "#src/types";
+import type { DecisionEventFacts } from "./descriptor";
 
 /**
  * Build the child-fixed access facts for a path-shaped gate from its
@@ -62,11 +60,12 @@ export function deriveDecisionValue(
 }
 
 /**
- * Build a `PermissionDecisionEvent` from the gate's inputs.
+ * Build a decision event's facts from the gate's inputs.
  *
  * Centralises the `origin / agentName / matchedPattern ?? null` normalization
  * that is otherwise duplicated across the session-hit path and the gate-result
- * path in `runGateCheck`.
+ * path in `runGateCheck`. The request id is stamped by the runner, which is
+ * where it was minted.
  */
 export function buildDecisionEvent(
   decision: { surface: string; value: string },
@@ -74,7 +73,7 @@ export function buildDecisionEvent(
   agentName: string | null,
   result: "allow" | "deny",
   resolution: PermissionDecisionResolution,
-): PermissionDecisionEvent {
+): DecisionEventFacts {
   return {
     surface: decision.surface,
     value: decision.value,
@@ -112,4 +111,33 @@ export function deriveResolution(
     return hasSession ? "user_approved_for_session" : "user_approved";
   }
   return confirmationUnavailable ? "confirmation_unavailable" : "user_denied";
+}
+
+/**
+ * The standing yolo grant covering a gate's resolved check, or `null` when
+ * yolo does not answer it.
+ *
+ * yolo is primarily recorded authority: `rewriteAsksToYolo` turns every `ask`
+ * rule into an `allow` tagged `origin: "yolo"` at composition (#526), and the
+ * first arm recognizes that grant. The second arm covers an `ask` synthesized
+ * *after* resolution — the bash wrapper floor (#481, #490) and the fail-closed
+ * `<unparseable-bash-command>` sentinel (#452) — which the ruleset rewrite
+ * cannot reach because the floor is a property of a parsed command unit, not of
+ * a pattern (#712). The synthetic `matchedPattern` is preserved so the review
+ * log still shows why the ask was raised, while `origin: "yolo"` records why it
+ * was granted.
+ *
+ * A `deny` matches neither arm, so an explicit deny survives yolo.
+ */
+export function resolveYoloGrant(
+  check: PermissionCheckResult,
+  yoloEnabled: boolean,
+): PermissionCheckResult | null {
+  if (check.state === "allow" && check.origin === "yolo") {
+    return check;
+  }
+  if (check.state === "ask" && yoloEnabled) {
+    return { ...check, state: "allow", origin: "yolo" };
+  }
+  return null;
 }

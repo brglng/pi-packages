@@ -106,8 +106,23 @@ describe("resolveBashAdvisoryCheck", () => {
       const result = resolveBashAdvisoryCheck("> out.txt", undefined, resolver);
       expect(result.state).toBe("ask");
       expect(result.matchedPattern).toBe("<unparseable-bash-command>");
-      // The synthetic fail-closed decision does not consult the resolver.
-      expect(resolver.resolve).not.toHaveBeenCalled();
+      // The whole command is resolved once, to see whether a deny covers it.
+      expect(resolver.resolve).toHaveBeenCalledTimes(1);
+    });
+
+    it("reports the explicit deny for an unparseable command covered by a deny rule", () => {
+      const resolver = makeBashResolver({
+        "> out.txt": makeCheckResult({
+          state: "deny",
+          toolName: "bash",
+          matchedPattern: "> *",
+        }),
+      });
+
+      const result = resolveBashAdvisoryCheck("> out.txt", undefined, resolver);
+
+      expect(result.state).toBe("deny");
+      expect(result.matchedPattern).toBe("> *");
     });
 
     it("evaluates a nested command inside a substitution", () => {
@@ -128,6 +143,31 @@ describe("resolveBashAdvisoryCheck", () => {
         resolver,
       );
       expect(result.state).toBe("deny");
+      expect(result.commandContext).toBe("command_substitution");
+    });
+
+    it("evaluates a nested command hosted in a redirect target (#741)", () => {
+      const resolver = makeBashResolver({
+        'echo "hello world"': makeCheckResult({
+          state: "allow",
+          toolName: "bash",
+          matchedPattern: "echo *",
+        }),
+        "rm *.txt": makeCheckResult({
+          state: "deny",
+          toolName: "bash",
+          matchedPattern: "rm *",
+        }),
+      });
+
+      const result = resolveBashAdvisoryCheck(
+        'echo "hello world" > $(rm *.txt)',
+        undefined,
+        resolver,
+      );
+
+      expect(result.state).toBe("deny");
+      expect(result.matchedPattern).toBe("rm *");
       expect(result.commandContext).toBe("command_substitution");
     });
   });

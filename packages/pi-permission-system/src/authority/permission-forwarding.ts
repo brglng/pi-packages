@@ -1,5 +1,7 @@
 import { join } from "node:path";
+import type { DecisionSource } from "#src/authority/decision-source";
 import type { PermissionUiPromptSource } from "#src/permission-events";
+import type { PromptPayload } from "#src/presentation/prompt-payload";
 import type { PermissionDecisionState } from "./permission-dialog";
 import type { SubagentSessionRegistry } from "./subagent-registry";
 
@@ -53,9 +55,9 @@ const SESSION_FORWARDING_RESPONSES_DIRECTORY_NAME = "responses";
  * Display fields relayed from a forwarding child to the parent UI so the parent
  * can emit a non-degraded `permissions:ui_prompt` event.
  *
- * Carried separately from the prompt message because the parent reconstructs
+ * Carried separately from the prompt payload because the parent reconstructs
  * the original event from the escalated ask's details (`buildUiPrompt`), not
- * from the message text.
+ * from the payload's own facts.
  */
 export interface ForwardedPromptDisplay {
   source: PermissionUiPromptSource;
@@ -123,7 +125,15 @@ export type ForwardedPermissionRequest = {
   requesterSessionId: string;
   targetSessionId: string;
   requesterAgentName: string;
-  message: string;
+  /**
+   * The child's complete prompt payload (ADR 0011 §2), so the serving node
+   * renders the child's own facts under the *parent's* budget rather than
+   * relaying a sentence the child assembled under its own configuration.
+   *
+   * Optional for version-skew tolerance: an older child omits it, and the
+   * serving node renders from the display fields it does carry (ADR 0011 §9).
+   */
+  payload?: PromptPayload;
   /**
    * Original prompt display fields, persisted so the parent emits a
    * non-degraded event. Optional for version-skew tolerance: a parent on a
@@ -154,6 +164,18 @@ export type ForwardedPermissionResponse = {
   denialReason?: string;
   responderSessionId: string;
   respondedAt: number;
+  /**
+   * What decided, inside the responding session (#726).
+   *
+   * `responderSessionId` names *where* the decision was made; this names
+   * *what* made it, which is the difference between a human at the parent's
+   * dialog and the parent's policy answering on their behalf.
+   *
+   * Optional for version-skew tolerance: an older responder omits it, and the
+   * requester records the hop with a `null` inner decision rather than
+   * rejecting the answer.
+   */
+  decidedBy?: DecisionSource;
 };
 
 export type PermissionForwardingLocation = {
@@ -179,7 +201,15 @@ export function normalizePermissionForwardingSessionId(
   return trimmed;
 }
 
-function encodeSessionIdForPath(sessionId: string): string {
+/**
+ * Make a session id safe to name a path segment.
+ *
+ * Exported because the forwarding tree has two layouts keyed by session id —
+ * `sessions/<id>/` and the serving-heartbeat records beside it — and a second
+ * encoding would be a silent way for the two to disagree about which file
+ * belongs to which session.
+ */
+export function encodeSessionIdForPath(sessionId: string): string {
   return encodeURIComponent(sessionId);
 }
 

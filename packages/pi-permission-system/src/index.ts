@@ -8,11 +8,18 @@ import {
   ForwardedRequestServer,
   type ServingPolicy,
 } from "./authority/forwarded-request-server";
+import {
+  ForwardingLivenessJudge,
+  ServingHeartbeatStore,
+} from "./authority/forwarding-liveness";
 import { ForwardingManager } from "./authority/forwarding-manager";
 import { PERMISSION_FORWARDING_TIMEOUT_MS } from "./authority/permission-forwarding";
 import { requestPermissionDecision } from "./authority/permission-prompt-component";
 import { PermissionPrompter } from "./authority/permission-prompter";
-import { getServingSessionRegistry } from "./authority/serving-registry";
+import {
+  composeServingAnnouncers,
+  getServingSessionRegistry,
+} from "./authority/serving-registry";
 import { SubagentDetection } from "./authority/subagent-detection";
 import { subscribeSubagentLifecycle } from "./authority/subagent-lifecycle-events";
 import { getSubagentSessionRegistry } from "./authority/subagent-registry";
@@ -38,6 +45,7 @@ import { PermissionManager } from "./permission-manager";
 import { PermissionResolver } from "./permission-resolver";
 import { PermissionSession } from "./permission-session";
 import { LocalPermissionsService } from "./permissions-service";
+import { resolveRenderBudget } from "./presentation/dialog-renderer";
 import { PermissionServiceLifecycle } from "./service-lifecycle";
 import { PermissionSessionLogger } from "./session-logger";
 import { SessionRules } from "./session-rules";
@@ -84,13 +92,16 @@ export default function piPermissionSystemExtension(pi: ExtensionAPI): void {
   // eslint-disable-next-line prefer-const -- forward-declared let; `const` requires an initializer
   let session: PermissionSession;
 
-  // Constructed after the `configStore` forward declaration so the yolo reader
-  // can close over it; the closure runs per check(), after configStore is
-  // assigned below. yolo becomes a composition-stage ask→allow rewrite (#526).
+  // Declared after the `configStore` forward declaration so the reader can
+  // close over it; every call runs after configStore is assigned below. yolo is
+  // a composition-stage ask→allow rewrite (#526) that the gate runner extends
+  // to asks synthesized after resolution (#712), so both share this reader.
+  const isYoloEnabled = (): boolean => isYoloModeEnabled(configStore.current());
+
   const permissionManager = new PermissionManager({
     agentDir,
     flavor: hostFlavor,
-    isYoloEnabled: () => isYoloModeEnabled(configStore.current()),
+    isYoloEnabled,
   });
 
   const logger = new PermissionSessionLogger({
@@ -107,16 +118,31 @@ export default function piPermissionSystemExtension(pi: ExtensionAPI): void {
 
   const prompter = new PermissionPrompter({ logger });
 
+  // The filesystem half of the serving announcement. `servingRegistry` reaches
+  // an in-process child through `globalThis`; a child in its own process shares
+  // nothing but this directory, so the served session publishes a heartbeat
+  // there too (#721).
+  const servingHeartbeats = new ServingHeartbeatStore({
+    forwardingDir: paths.forwardingDir,
+    logger,
+  });
+  // The read side of both channels, routed by how the target was resolved.
+  const servingLiveness = new ForwardingLivenessJudge({
+    registry: servingRegistry,
+    heartbeats: servingHeartbeats,
+  });
+
   const authorizerSelection = new AuthorizerSelection({
     detection: subagentDetection,
     events: pi.events,
     getPromptPreferences: () => ({
       doublePressToConfirm: configStore.current().doublePressToConfirm,
+      budget: resolveRenderBudget(configStore.current()),
     }),
     requestPermissionDecision,
     forwardingDir: paths.forwardingDir,
     registry: subagentRegistry,
-    servingRegistry,
+    serving: servingLiveness,
     getForwardingTimeoutMs: () =>
       configStore.current().forwardingTimeoutMs ??
       PERMISSION_FORWARDING_TIMEOUT_MS,
@@ -172,7 +198,7 @@ export default function piPermissionSystemExtension(pi: ExtensionAPI): void {
     new ForwardingManager({
       detection: subagentDetection,
       forwarder: requestServer,
-      serving: servingRegistry,
+      serving: composeServingAnnouncers(servingRegistry, servingHeartbeats),
       logger,
     }),
     permissionManager,
@@ -255,6 +281,7 @@ export default function piPermissionSystemExtension(pi: ExtensionAPI): void {
     sessionRules,
     authorizerSelection,
     reporter,
+    isYoloEnabled,
   );
   const toolCallGatePipeline = new ToolCallGatePipeline(
     resolver,

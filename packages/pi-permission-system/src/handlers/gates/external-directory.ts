@@ -1,11 +1,11 @@
 import { getToolInputPath } from "#src/access-intent/tool-input-path";
 import type { PathNormalizer } from "#src/path-normalizer";
 import type { ScopedPermissionResolver } from "#src/permission-resolver";
+import { buildExternalDirectoryAskPayload } from "#src/presentation/path-ask-payload";
 import { SessionApproval } from "#src/session-approval";
 import { deriveApprovalPattern } from "#src/session-rules";
 import type { ToolAccessExtractorLookup } from "#src/tool-access-extractor-registry";
 import type { GateResult } from "./descriptor";
-import { formatExternalDirectoryAskPrompt } from "./external-directory-messages";
 import { resolveExternalDirectoryPolicy } from "./external-directory-policy";
 import { accessFactsFromPath } from "./helpers";
 import type { ToolCallContext } from "./types";
@@ -45,6 +45,8 @@ export function describeExternalDirectoryGate(
   if (normalizer.isInfrastructureRead(tcc.toolName, accessPath, infraDirs)) {
     return {
       action: "allow",
+      // Containment allowed this, not a rule the operator wrote.
+      decidedBy: { kind: "infrastructure_read" },
       log: {
         event: "permission_request.infrastructure_auto_allowed",
         details: {
@@ -69,13 +71,6 @@ export function describeExternalDirectoryGate(
 
   // ── Build descriptor for permission check ───────────────────────────────
   const resolvedAlias = accessPath.resolvedAlias();
-  const extDirMessage = formatExternalDirectoryAskPrompt(
-    tcc.toolName,
-    externalDirectoryPath,
-    resolvedAlias,
-    tcc.cwd,
-    tcc.agentName ?? undefined,
-  );
 
   // The runner consumes this preCheck and skips its own resolve.
   const preCheck = resolveExternalDirectoryPolicy(
@@ -85,23 +80,24 @@ export function describeExternalDirectoryGate(
   );
   const pattern = deriveApprovalPattern(accessPath.value());
 
+  const payload = buildExternalDirectoryAskPayload({
+    toolName: tcc.toolName,
+    pathValue: externalDirectoryPath,
+    resolvedPath: resolvedAlias,
+    cwd: tcc.cwd,
+    agentName: tcc.agentName,
+    matchedPattern: preCheck.matchedPattern,
+  });
+
   return {
     surface: "external_directory",
     input: {},
     preCheck,
-    denialContext: {
-      kind: "external_directory",
-      toolName: tcc.toolName,
-      pathValue: externalDirectoryPath,
-      resolvedPath: resolvedAlias,
-      cwd: tcc.cwd,
-      agentName: tcc.agentName ?? undefined,
-    },
+    payload,
     sessionApproval: SessionApproval.single("external_directory", pattern),
     promptDetails: {
       source: "tool_call",
       agentName: tcc.agentName,
-      message: extDirMessage,
       toolCallId: tcc.toolCallId,
       toolName: tcc.toolName,
       path: externalDirectoryPath,
@@ -113,7 +109,6 @@ export function describeExternalDirectoryGate(
       toolName: tcc.toolName,
       agentName: tcc.agentName,
       path: externalDirectoryPath,
-      message: extDirMessage,
     },
     decision: {
       surface: "external_directory",
