@@ -9,6 +9,7 @@
 | [@brglng/pi-permission-system](packages/pi-permission-system) | 为 Pi coding agent 提供集中、确定性的权限门控，覆盖 tool、bash、MCP、skill 及特殊操作。 | 在权限结果（及审核日志）中增加 `fullCommand` 字段，使 `@brglng/pi-permission-auto-review` 等 authorizer 链接能收到完整的链式 bash 命令，而不仅是匹配到的子命令。 | [Pi Packages](https://pi.dev/packages/@gotgenes/pi-permission-system) · [NPM](https://www.npmjs.com/package/@gotgenes/pi-permission-system) · [Repository](https://github.com/gotgenes/pi-packages/tree/main/packages/pi-permission-system) |
 | [@brglng/pi-permission-auto-review](packages/pi-permission-auto-review) | 基于模型的边界审批代理，作为 authorizer 链的一环与 pi-permission-system 集成。 | 优先使用 `@brglng/pi-permission-system` 提供的 `fullCommand` 字段，将链式命令作为整体审核；类型导入与 peer 依赖均指向 brglng fork。 | [Pi Packages](https://pi.dev/packages/@erichll/pi-auto-review) · [NPM](https://www.npmjs.com/package/@erichll/pi-auto-review) · [Repository](https://github.com/erichll/pi-packages/tree/main/packages/pi-auto-review) |
 | [@brglng/pi-portable-sessions](packages/pi-portable-sessions) | 将 Pi 按项目划分的 session 存储目录重命名为可移植、与机器无关的名字（家目录前缀 → `HOME`、其他根目录 → `ROOT`、其余部分 URL 编码），并提供 `/portable-sessions` 命令。 | —（原创，无上游） | — |
+| [@brglng/pi-bailian](packages/pi-bailian) | 阿里云百炼 Token Plan 与 Coding Plan Provider，支持可配置 workspaceId、模型自动发现，并按模型选择 Responses 或 Chat Completions。 | —（原创，无上游） | — |
 
 每个包都是独立的 npm 包，可分别发布与安装：
 

@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Pi Bailian configuration",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "workspaceId": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Bailian workspace ID, such as token-plan or coding-plan."
+    },
+    "plan": {
+      "type": "string",
+      "enum": ["token-plan", "coding-plan", "custom"],
+      "default": "token-plan"
+    },
+    "baseUrl": {
+      "type": ["string", "null"],
+      "description": "Optional custom compatible API base URL."
+    },
+    "discoverModels": {
+      "type": "boolean",
+      "default": true
+    },
+    "preferResponses": {
+      "type": "boolean",
+      "default": true
+    }
+  }
+}
