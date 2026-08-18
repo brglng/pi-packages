@@ -55,6 +55,18 @@ describe("custom provider configuration", () => {
 });
 
 describe("model mapping", () => {
+  it("preserves the OpenAI version path", () => {
+    const model = mapModel(
+      {
+        ...provider,
+        baseUrl: "https://gateway.example/v1",
+        api: "openai-completions",
+      },
+      { id: "gateway-model" },
+    );
+    expect(model?.baseUrl).toBe("https://gateway.example/v1");
+  });
+
   it("prefers explicit model settings and keeps server metadata", () => {
     const model = mapModel(
       {
