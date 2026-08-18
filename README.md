@@ -12,6 +12,7 @@ A collection of Pi coding-agent extensions maintained by brglng.
 | [@brglng/pi-auto-review](packages/pi-auto-review) | A model-backed boundary approval broker that integrates with pi-permission-system as an authorizer-chain link. | Prefers the `fullCommand` field from `@brglng/pi-permission-system` so a chained command is reviewed as a whole; type imports and the peer dependency point at the brglng fork. | [Pi Packages](https://pi.dev/packages/@erichll/pi-auto-review) · [NPM](https://www.npmjs.com/package/@erichll/pi-auto-review) · [Repository](https://github.com/erichll/pi-packages/tree/main/packages/pi-auto-review) |
 | [@brglng/pi-portable-sessions](packages/pi-portable-sessions) | Renames Pi's per-project session directories to portable, machine-independent names (home prefix → `HOME`, other roots → `ROOT`, remainder URL-encoded), with a `/portable-sessions` command. | — (original; no upstream) | — |
 | [@brglng/pi-bailian](packages/pi-bailian) | Aliyun Bailian Token Plan and Coding Plan provider with configurable workspace IDs and model discovery, using Responses or Chat Completions as appropriate. | — (original; no upstream) | — |
+| [@brglng/pi-custom-providers](packages/pi-custom-providers) | Configurable multi-provider model discovery extension supporting per-model endpoints, API types, and metadata overrides. | — (original; no upstream) | — |
 
 Each package is a standalone npm package and can be published and installed
 independently:

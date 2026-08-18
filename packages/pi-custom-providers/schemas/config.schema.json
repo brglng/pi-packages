@@ -1,0 +1,37 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Pi custom provider configuration",
+  "type": "object",
+  "additionalProperties": true,
+  "required": ["baseUrl"],
+  "properties": {
+    "name": { "type": "string" },
+    "baseUrl": { "type": "string", "format": "uri" },
+    "apiKey": {
+      "type": "string",
+      "description": "Pi config value: literal, $ENV_VAR, ${ENV_VAR}, or !command."
+    },
+    "api": { "type": "string" },
+    "reasoning": { "type": "boolean" },
+    "thinkingLevelMap": { "type": "object" },
+    "input": {
+      "type": "array",
+      "items": { "enum": ["text", "image"] }
+    },
+    "cost": { "type": "object" },
+    "contextWindow": { "type": "number", "exclusiveMinimum": 0 },
+    "maxTokens": { "type": "number", "exclusiveMinimum": 0 },
+    "headers": { "type": "object", "additionalProperties": { "type": "string" } },
+    "samplingParams": { "type": "object", "additionalProperties": true },
+    "compat": { "type": "object" },
+    "discoverModels": { "type": "boolean", "default": true },
+    "modelsPath": { "type": "string", "default": "/models" },
+    "models": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": true
+      }
+    }
+  }
+}

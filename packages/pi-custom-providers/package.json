@@ -1,0 +1,76 @@
+{
+  "name": "@brglng/pi-custom-providers",
+  "version": "0.1.0",
+  "description": "Configurable multi-provider model discovery extension for Pi",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/public.d.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "files": [
+    "src",
+    "dist",
+    "config/config.example.json",
+    "schemas/config.schema.json",
+    "README.md",
+    "README.zh.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "check": "tsc --noEmit",
+    "build:types": "rollup -c rollup.dts.config.mjs",
+    "prepack": "pnpm run build:types",
+    "test": "vitest run",
+    "lint:md": "rumdl check *.md",
+    "lint": "biome check . && pnpm run lint:md"
+  },
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-extension",
+    "coding-agent",
+    "custom-provider",
+    "model-discovery",
+    "openai",
+    "anthropic"
+  ],
+  "author": {
+    "name": "brglng"
+  },
+  "license": "MPL-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/brglng/pi-packages.git",
+    "directory": "packages/pi-custom-providers"
+  },
+  "homepage": "https://github.com/brglng/pi-packages/tree/main/packages/pi-custom-providers#readme",
+  "bugs": {
+    "url": "https://github.com/brglng/pi-packages/issues"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "pi": {
+    "extensions": [
+      "./src/index.ts"
+    ]
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": ">=0.79.0"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "catalog:",
+    "@earendil-works/pi-coding-agent": "0.79.1",
+    "@types/node": "catalog:",
+    "rollup": "catalog:",
+    "rollup-plugin-dts": "catalog:",
+    "rumdl": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

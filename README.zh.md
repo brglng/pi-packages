@@ -10,6 +10,7 @@
 | [@brglng/pi-auto-review](packages/pi-auto-review) | 基于模型的边界审批代理，作为 authorizer 链的一环与 pi-permission-system 集成。 | 优先使用 `@brglng/pi-permission-system` 提供的 `fullCommand` 字段，将链式命令作为整体审核；类型导入与 peer 依赖均指向 brglng fork。 | [Pi Packages](https://pi.dev/packages/@erichll/pi-auto-review) · [NPM](https://www.npmjs.com/package/@erichll/pi-auto-review) · [Repository](https://github.com/erichll/pi-packages/tree/main/packages/pi-auto-review) |
 | [@brglng/pi-portable-sessions](packages/pi-portable-sessions) | 将 Pi 按项目划分的 session 存储目录重命名为可移植、与机器无关的名字（家目录前缀 → `HOME`、其他根目录 → `ROOT`、其余部分 URL 编码），并提供 `/portable-sessions` 命令。 | —（原创，无上游） | — |
 | [@brglng/pi-bailian](packages/pi-bailian) | 阿里云百炼 Token Plan 与 Coding Plan Provider，支持可配置 workspaceId、模型自动发现，并按模型选择 Responses 或 Chat Completions。 | —（原创，无上游） | — |
+| [@brglng/pi-custom-providers](packages/pi-custom-providers) | 可配置多 Provider 的模型自动发现扩展，支持按模型覆盖 Endpoint、API 类型和模型参数。 | —（原创，无上游） | — |
 
 每个包都是独立的 npm 包，可分别发布与安装：
 

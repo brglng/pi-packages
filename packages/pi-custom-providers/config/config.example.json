@@ -1,0 +1,19 @@
+{
+  "name": "My OpenAI Gateway",
+  "baseUrl": "https://api.example.com/v1",
+  "apiKey": "$MY_OPENAI_API_KEY",
+  "api": "openai-completions",
+  "discoverModels": true,
+  "modelsPath": "/models",
+  "models": {
+    "special-model": {
+      "api": "anthropic-messages",
+      "baseUrl": "https://anthropic.example.com/v1",
+      "reasoning": true,
+      "maxTokens": 32768,
+      "compat": {
+        "supportsDeveloperRole": false
+      }
+    }
+  }
+}
