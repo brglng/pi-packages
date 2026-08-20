@@ -5,12 +5,13 @@ Guidelines for agents working in this repository.
 ## Ask before merging from upstream
 
 Before modifying a forked extension package, ask the user whether to first
-merge the latest upstream functionality. Offer an option to skip upstream
-merges for the rest of the current session, without asking again.
+merge the latest upstream functionality. Before the merge, you must examine
+the changes in the upstream after our fork point, show them to the user, and
+clarify with the user on how to do the merge. You must provide several solutions
+with you advice and recommendation.
 
 The upstream remotes are:
 
-- `@brglng/pi-permission-system` → `https://github.com/gotgenes/pi-packages` (path `packages/pi-permission-system`)
 - `@brglng/pi-auto-review` → `https://github.com/erichll/pi-packages` (path `packages/pi-auto-review`)
 
 Do not use `git merge`: this repo shares no common ancestor with the upstream
