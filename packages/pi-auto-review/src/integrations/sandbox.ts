@@ -3,17 +3,10 @@ import type { BoundaryRequest } from "../broker/types.ts";
 export type SandboxFilesystemTrap = {
   kind: "filesystem";
   operation: "read" | "write";
-  code?: string;
-  state?: string;
   path: string;
   requested_path?: string;
   reason?: string;
   query_id?: string;
-  syscall?: string;
-  errno?: string;
-  flags?: string[];
-  suggested_grant?: Record<string, unknown>;
-  mechanism?: string;
   process?: {
     pid?: number;
     exe?: string | null;

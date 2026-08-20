@@ -257,13 +257,14 @@ export class PermissionUiAutoConfirmer {
 function parsePermissionUiPromptEvent(
   raw: unknown,
 ): PermissionUiPromptEvent | undefined {
-  if (!isRecord(raw) || typeof raw.requestId !== "string") return;
-  if (typeof raw.message === "string") {
-    return { requestId: raw.requestId, message: raw.message };
+  if (!isRecord(raw)) return;
+  if (
+    typeof raw.requestId !== "string" ||
+    typeof raw.message !== "string"
+  ) {
+    return;
   }
-  const request = isRecord(raw.request) ? raw.request : undefined;
-  if (!request || typeof request.value !== "string") return;
-  return { requestId: raw.requestId, message: request.value };
+  return { requestId: raw.requestId, message: raw.message };
 }
 
 function isPermissionPromptComponent(

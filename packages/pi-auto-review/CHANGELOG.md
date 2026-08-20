@@ -1,5 +1,51 @@
 # Changelog
 
+## 0.6.0 - 2026-08-20
+
+- **Remove host user-constraint overlay.** Stop rewriting model allows from
+  regex matches on user text (`constraintEffect` / `vagueContinuation` /
+  authorization ceilings). Older messages enter evidence only via an exact
+  request reference or trusted `/approve` retry. Compaction summaries remain
+  excluded from user intent. Hard denies, grant hashing, and the reviewer
+  model are unchanged.
+
+## 0.5.0 - 2026-08-20
+
+- **Safer evidence selection.** Review only request-linked tool calls, paired
+  results, current-task user intent, and bounded security evidence. Compaction
+  summaries cannot restore authorization, raw revocations override model
+  allows, and missing mandatory evidence fails closed before a model call.
+- **Independent, smaller reviewer requests.** Use one compact canonical request
+  envelope and a byte-stable policy prefix, reducing fixed input from 2,011 to
+  1,396 characters. Independent SSE calls prevent prior review state from
+  carrying into later approvals while preserving cache/routing identity.
+- **Explicit token limits.** Add tighten-only `maxReviewerInputTokens` with an
+  8,192 default and conservative UTF-8 accounting across the complete prompt.
+  Lower the default `maxTokens` from 1,600 to 256 after sequential real-model
+  validation at 384 and 256; the legal range remains 256–4,096.
+- **Typed, bounded retries.** Share one deadline across each review, disable
+  provider-internal retries, and allow at most two actual model calls. Only
+  format errors, recognized connection/5xx failures, and bounded 429 responses
+  retry; deterministic and unknown failures remain terminal and fail closed.
+- **Privacy-bounded telemetry.** Record per-attempt usage and per-review
+  summaries for both reviewer entry points using stable status/error codes and
+  prompt-part counts, without logging evidence text, provider errors,
+  credentials, headers, or URL query values.
+
+## 0.4.0 - 2026-08-19
+
+- **Credential-exfiltration hardening.** Expand deterministic terminal denies to cover
+  `.env` variants, common credential files, additional file readers and encoders,
+  shell substitutions, staged variables, redirects, and multi-stage pipelines that
+  upload credentials to network sinks. Template files such as `.env.example` and
+  `.env.sample` remain reviewable.
+- **Reviewer refresh safety.** Re-resolve reviewer model/provider metadata for each
+  review, reacquire authentication for each attempt, and bind the reviewer session
+  identity to the endpoint and authentication fingerprint so provider or OAuth
+  refreshes cannot reuse a stale connection.
+- **Compatibility.** Require Pi 0.84.1+ and permission-system 25.1.0+ to match the
+  current reviewer and forwarded-permission contracts.
+
 ## 0.3.5 - 2026-08-13
 
 - Raise the default model-review `timeoutMs` from 45s to 90s and the default
