@@ -11,6 +11,7 @@
 | [@brglng/pi-portable-sessions](packages/pi-portable-sessions) | 将 Pi 按项目划分的 session 存储目录重命名为可移植、与机器无关的名字（家目录前缀 → `HOME`、其他根目录 → `ROOT`、其余部分 URL 编码），并提供 `/portable-sessions` 命令。 | —（原创，无上游） | — |
 | [@brglng/pi-bailian](packages/pi-bailian) | 阿里云百炼 Token Plan 与 Coding Plan Provider，支持可配置 workspaceId、模型自动发现，并按模型选择 Responses 或 Chat Completions。 | —（原创，无上游） | — |
 | [@brglng/pi-custom-providers](packages/pi-custom-providers) | 可配置多 Provider 的模型自动发现扩展，支持按模型覆盖 Endpoint、API 类型和模型参数。 | —（原创，无上游） | — |
+| [@brglng/pi-currency-cost](packages/pi-currency-cost) | 在每条最终确定的 assistant 消息上，将已配置 Provider/Model 的用量费用换算为 USD，支持按 Provider 设置币种、精确的按模型覆盖与可插拔的汇率来源。 | —（原创，无上游） | — |
 
 每个包都是独立的 npm 包，可分别发布与安装：
 

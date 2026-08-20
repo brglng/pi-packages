@@ -1,0 +1,34 @@
+{
+  "$schema": "https://raw.githubusercontent.com/brglng/pi-packages/main/packages/pi-currency-cost/schemas/config.schema.json",
+  "currencies": {
+    "CNY": {
+      "usdRate": 0.147
+    },
+    "EUR": {
+      "usdRate": 1.083,
+      "updatedAt": 1720000000000
+    }
+  },
+  "providers": {
+    "bailian": {
+      "currency": "CNY"
+    },
+    "openrouter": {
+      "currency": "USD"
+    },
+    "my-gateway": {
+      "currency": "EUR",
+      "models": {
+        "euro-model": {
+          "currency": "EUR"
+        },
+        "usd-model": {
+          "currency": "USD"
+        }
+      }
+    }
+  },
+  "rateSource": {
+    "type": "frankfurter"
+  }
+}

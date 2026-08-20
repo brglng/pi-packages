@@ -1,0 +1,105 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Pi currency-cost configuration",
+  "description": "Convert configured provider/model usage costs to USD for Pi sessions.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "currencies": {
+      "type": "object",
+      "description": "USD rates keyed by 3-letter currency code.",
+      "propertyNames": {
+        "pattern": "^[A-Z]{3}$"
+      },
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": true,
+        "properties": {
+          "usdRate": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "description": "USD per one unit of the currency. Required for every configured non-USD currency; a fetched rate replaces it."
+          },
+          "updatedAt": {
+            "type": "number",
+            "description": "Epoch milliseconds when usdRate was last set or fetched."
+          }
+        }
+      }
+    },
+    "providers": {
+      "type": "object",
+      "description": "Provider IDs to convert. Providers not listed here are never converted.",
+      "propertyNames": {
+        "not": {
+          "pattern": "^(?:__proto__|constructor|prototype)$"
+        }
+      },
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": true,
+        "properties": {
+          "currency": {
+            "type": "string",
+            "pattern": "^[A-Z]{3}$",
+            "description": "Currency Pi-reported usage costs are denominated in for this provider."
+          },
+          "models": {
+            "type": "object",
+            "description": "Exact per-model currency overrides; a model override wins over the provider currency.",
+            "propertyNames": {
+              "not": {
+                "pattern": "^(?:__proto__|constructor|prototype)$"
+              }
+            },
+            "additionalProperties": {
+              "type": "object",
+              "additionalProperties": true,
+              "properties": {
+                "currency": {
+                  "type": "string",
+                  "pattern": "^[A-Z]{3}$"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "rateSource": {
+      "description": "Source of current USD rates. Defaults to the fixed Frankfurter currency converter endpoint.",
+      "oneOf": [
+        {
+          "type": "string",
+          "enum": ["boc", "frankfurter"]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "boc"
+            },
+            "timeoutMs": {
+              "type": "number",
+              "minimum": 1000,
+              "maximum": 60000
+            }
+          }
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "frankfurter"
+            },
+            "timeoutMs": {
+              "type": "number",
+              "minimum": 1000,
+              "maximum": 60000
+            }
+          }
+        }
+      ]
+    }
+  }
+}

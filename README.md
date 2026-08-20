@@ -13,6 +13,7 @@ A collection of Pi coding-agent extensions maintained by brglng.
 | [@brglng/pi-portable-sessions](packages/pi-portable-sessions) | Renames Pi's per-project session directories to portable, machine-independent names (home prefix → `HOME`, other roots → `ROOT`, remainder URL-encoded), with a `/portable-sessions` command. | — (original; no upstream) | — |
 | [@brglng/pi-bailian](packages/pi-bailian) | Aliyun Bailian Token Plan and Coding Plan provider with configurable workspace IDs and model discovery, using Responses or Chat Completions as appropriate. | — (original; no upstream) | — |
 | [@brglng/pi-custom-providers](packages/pi-custom-providers) | Configurable multi-provider model discovery extension supporting per-model endpoints, API types, and metadata overrides. | — (original; no upstream) | — |
+| [@brglng/pi-currency-cost](packages/pi-currency-cost) | Converts configured provider/model usage costs to USD on every finalized assistant message, with per-provider currencies, exact model overrides, and pluggable rate sources. | — (original; no upstream) | — |
 
 Each package is a standalone npm package and can be published and installed
 independently:
